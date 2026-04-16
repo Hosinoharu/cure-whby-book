@@ -1,0 +1,6 @@
+todo.md
+temp
+node_modules
+dist
+*.zip
+package-lock.json

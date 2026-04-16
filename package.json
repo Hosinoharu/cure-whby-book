@@ -1,0 +1,21 @@
+{
+  "name": "cure-whby-book",
+  "version": "1.0.0",
+  "description": "download book from WHBY",
+  "author": "Hosinoharu",
+  "license": "MIT",
+  "type": "module",
+  "main": "index.ts",
+  "scripts": {
+    "build": "vite build"
+  },
+  "dependencies": {
+    "crypto-js": "^4.2.0"
+  },
+  "devDependencies": {
+    "@types/chrome": "^0.1.40",
+    "@types/node": "^25.6.0",
+    "devtools-protocol": "^0.0.1612613",
+    "vite": "^8.0.8"
+  }
+}
