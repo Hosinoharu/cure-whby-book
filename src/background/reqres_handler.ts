@@ -2,7 +2,7 @@
 
 import Protocol from "devtools-protocol";
 import CureLogger from "./logger";
-import * as TargetAPI from "./target_api";
+import * as target_api from "./target_api";
 
 const logger = new CureLogger("bg/reqres_handler");
 
@@ -15,8 +15,9 @@ export async function start_debugger(tabId: number) {
         // #cure-tip 拦截指定的资源
         // 不同阅读模式下，需要拦截的资源不同，这里直接拦截【所有可能需要的资源好了】
         const patterns: Protocol.Fetch.RequestPattern[] = [
-            TargetAPI.BOOK_INFO,
-            TargetAPI.BOOK_CATALOG,
+            target_api.BOOK_INFO.fetch_req_pattern,
+            target_api.BOOK_CATALOG.fetch_req_pattern,
+            target_api.BOOK_EPUB_MODE_ONE_PAGE.fetch_req_pattern,
         ];
         await chrome.debugger.sendCommand({ tabId }, "Fetch.enable", {
             patterns,
@@ -158,8 +159,11 @@ function base64_decode_to_utf8(str: string) {
 function should_decode_res(req_url: string) {
     let result = true;
 
-    // 在拿到书籍的内容时，不需要再进行一次 base64 decode
+    // 在拿到书籍的内容时，不需要再进行一次 base64 decode，直接拿去进行解密处理就好
     // 其它的情况中，大都是需要转换的，比如获取书籍的信息
+    if (target_api.BOOK_EPUB_MODE_ONE_PAGE.urlpattern.test(req_url)) {
+        result = false;
+    }
 
     return result;
 }
