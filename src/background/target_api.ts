@@ -23,19 +23,40 @@ export const BOOK_INFO: TargetAPI = {
     }),
 };
 
-/** 获取书籍目录的 API。
+// #region 原貌阅读模式相关的 API
+
+/**  在【原貌阅读模式】中，获取书籍目录的 API。
  *
  * 形如 `https://wqbook.wqxuetang.com/deep/book/v1/catatree?bid=3226417`
  *
  * 其中 `bid` 是书籍的 id
  */
-export const BOOK_CATALOG: TargetAPI = {
+export const BOOK_PDF_MODE_CATALOG: TargetAPI = {
     fetch_req_pattern: {
         urlPattern: "*deep/book/v1/catatree*",
         resourceType: "XHR",
         requestStage: "Response",
     },
     urlpattern: new URLPattern({ pathname: "/deep/book/v1/catatree" }),
+};
+
+// #endregion
+
+// #region 流式阅读模式相关的 API
+
+/**  在【流式阅读模式】中，获取书籍目录的 API。
+ *
+ * 形如 `https://wqbook.wqxuetang.com/deep/epub/catatree/3244419?k=...`
+ *
+ * 其中 `3244419` 是书籍的 id
+ */
+export const BOOK_EPUB_MODE_CATALOG: TargetAPI = {
+    fetch_req_pattern: {
+        urlPattern: "*deep/epub/catatree*",
+        resourceType: "XHR",
+        requestStage: "Response",
+    },
+    urlpattern: new URLPattern({ pathname: "/deep/epub/catatree/:bid" }),
 };
 
 /** 在【流式阅读模式】中，每一页内容的 API
@@ -59,3 +80,5 @@ export const BOOK_EPUB_MODE_ONE_PAGE: TargetAPI = {
         pathname: "/deep/epub/read/:bid/:page/:chapter/:filename",
     }),
 };
+
+// #endregion

@@ -33,6 +33,11 @@ export default defineConfig({
         outDir,
         emptyOutDir: true,
     },
+    resolve: {
+        alias: {
+            "@": path.resolve(__dirname, "src"),
+        },
+    },
 });
 
 // #region vite plugin copy files

@@ -1,8 +1,9 @@
 /** 拦截请求与响应，完成书籍的下载 */
 
 import Protocol from "devtools-protocol";
-import CureLogger from "./logger";
+import CureLogger from "@/share/logger";
 import * as target_api from "./target_api";
+import { CureWhbyBookManager } from "./book_manager";
 
 const logger = new CureLogger("bg/reqres_handler");
 
@@ -16,7 +17,10 @@ export async function start_debugger(tabId: number) {
         // 不同阅读模式下，需要拦截的资源不同，这里直接拦截【所有可能需要的资源好了】
         const patterns: Protocol.Fetch.RequestPattern[] = [
             target_api.BOOK_INFO.fetch_req_pattern,
-            target_api.BOOK_CATALOG.fetch_req_pattern,
+            // pdf
+            target_api.BOOK_PDF_MODE_CATALOG.fetch_req_pattern,
+            // epub
+            target_api.BOOK_EPUB_MODE_CATALOG.fetch_req_pattern,
             target_api.BOOK_EPUB_MODE_ONE_PAGE.fetch_req_pattern,
         ];
         await chrome.debugger.sendCommand({ tabId }, "Fetch.enable", {
@@ -90,6 +94,9 @@ chrome.debugger.onEvent.addListener(async (source, method, params) => {
             "\n\t => res content:",
             content,
         );
+
+        // #cure-warn 根据响应的 URL、当前阅读模式等等，处理响应内容
+        handle_response(req_url!, content, "stream");
 
         await send_fetch_fulfill_request(tabId, temp);
     }
@@ -166,6 +173,35 @@ function should_decode_res(req_url: string) {
     }
 
     return result;
+}
+
+// #endregion
+
+// #region handle response
+
+function handle_response(url: string, content: string, mode: ReadMode) {
+    // 无论何种模式，书籍的基础信息（书名等）是一样的
+    const r = target_api.BOOK_INFO.urlpattern.exec(url);
+    if (r !== null) {
+        const bid = r.search.groups["bid"];
+        if (bid === undefined) {
+            logger.error("get book id from url failed. url: ", url);
+        }
+        if (!CureWhbyBookManager.save_book_data(content)) {
+            logger.error("save book data failed, content:", content);
+        }
+        return;
+    }
+
+    // 处理书籍内容
+    switch (mode) {
+        case "origin":
+            break;
+        case "stream":
+            break;
+        default:
+            throw new Error("unknown read mode");
+    }
 }
 
 // #endregion

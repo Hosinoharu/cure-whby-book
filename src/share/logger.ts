@@ -12,18 +12,40 @@ export default class CureLogger {
     private readonly log_style = `background-color:${this.cure_idol};${this.base_style}`;
     private readonly warn_style = `background-color:${this.cure_wink};${this.base_style}`;
     private readonly error_style = `background-color:${this.cure_kyun};${this.base_style}`;
+    private readonly time_prefix_style = "color:#aaa";
 
     constructor(private prefix: string) {}
 
+    private get_time_prefix() {
+        return new Date().toLocaleString("zh-CN", {
+            hour12: false,
+        });
+    }
+
     public log(title: string, ...args: any[]) {
-        raw_log(`%c[${this.prefix}] - ${title}`, this.log_style, ...args);
+        raw_log(
+            `%c${this.get_time_prefix()} %c[${this.prefix}] - ${title}`,
+            this.time_prefix_style,
+            this.log_style,
+            ...args,
+        );
     }
 
     public warn(title: string, ...args: any[]) {
-        raw_log(`%c[${this.prefix}] - ${title}`, this.warn_style, ...args);
+        raw_log(
+            `%c${this.get_time_prefix()} %c[${this.prefix}] - ${title}`,
+            this.time_prefix_style,
+            this.warn_style,
+            ...args,
+        );
     }
 
     public error(title: string, ...args: any[]) {
-        raw_error(`%c[${this.prefix}] - ${title}`, this.error_style, ...args);
+        raw_error(
+            `%c${this.get_time_prefix()} %c[${this.prefix}] - ${title}`,
+            this.time_prefix_style,
+            this.error_style,
+            ...args,
+        );
     }
 }
