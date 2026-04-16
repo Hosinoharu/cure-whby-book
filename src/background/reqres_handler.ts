@@ -14,7 +14,10 @@ export async function start_debugger(tabId: number) {
         // https://chromedevtools.github.io/devtools-protocol/tot/Fetch/#method-enable
         // #cure-tip 拦截指定的资源
         // 不同阅读模式下，需要拦截的资源不同，这里直接拦截【所有可能需要的资源好了】
-        const patterns: Protocol.Fetch.RequestPattern[] = [TargetAPI.BOOK_INFO];
+        const patterns: Protocol.Fetch.RequestPattern[] = [
+            TargetAPI.BOOK_INFO,
+            TargetAPI.BOOK_CATALOG,
+        ];
         await chrome.debugger.sendCommand({ tabId }, "Fetch.enable", {
             patterns,
         });
