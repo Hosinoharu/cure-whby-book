@@ -21,7 +21,8 @@
         "activeTab",
         "tabs",
         "debugger",
-        "storage"
+        "storage",
+        "unlimitedStorage"
     ],
     "host_permissions": [
         "<all_urls>"

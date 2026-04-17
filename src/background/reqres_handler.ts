@@ -6,6 +6,12 @@ import * as target_api from "./target_api";
 import { CureWhbyBookManager } from "./book_manager";
 
 const logger = new CureLogger("bg/reqres_handler");
+const DEBUG = {
+    /** 输出所有捕获到的 cdp 消息 */
+    LOG_ALL_CDP_MSG: false,
+    /** 输出插件拦截捕获的响应内容 */
+    LOG_CATCH_RESPONSE: false,
+};
 
 /** 监听特定标签页的请求与响应 */
 export async function start_debugger(tabId: number) {
@@ -16,7 +22,7 @@ export async function start_debugger(tabId: number) {
         // #cure-tip 拦截指定的资源
         // 不同阅读模式下，需要拦截的资源不同，这里直接拦截【所有可能需要的资源好了】
         const patterns: Protocol.Fetch.RequestPattern[] = [
-            target_api.BOOK_INFO.fetch_req_pattern,
+            target_api.BOOK_SIMPLE_DATA.fetch_req_pattern,
             // pdf
             target_api.BOOK_PDF_MODE_CATALOG.fetch_req_pattern,
             // epub
@@ -44,7 +50,7 @@ chrome.action.onClicked.addListener(async (tab) => {
     if (tab.id === undefined) {
         return;
     }
-    logger.log("debugger start");
+    logger.log("debugger start", tab.title, " - ", tab.url);
     await start_debugger(tab.id);
 });
 
@@ -52,14 +58,15 @@ chrome.action.onClicked.addListener(async (tab) => {
 chrome.debugger.onEvent.addListener(async (source, method, params) => {
     const req_url: string | undefined = (params as any).request?.url;
 
-    // logger.log(
-    //     "CDP message",
-    //     method,
-    //     "\n\t => request url:",
-    //     req_url,
-    //     "\n\t => cdp msg body:",
-    //     params,
-    // );
+    DEBUG.LOG_ALL_CDP_MSG &&
+        logger.log(
+            "CDP message",
+            method,
+            "\n\t => request url:",
+            req_url,
+            "\n\t => cdp msg body:",
+            params,
+        );
 
     const tabId = source.tabId;
     const requestId = (params as any).requestId as string;
@@ -87,18 +94,23 @@ chrome.debugger.onEvent.addListener(async (source, method, params) => {
             ? base64_decode_to_utf8(response.body)
             : response.body;
 
-        logger.log(
-            "get response content",
-            "\n\t => request url:",
-            req_url,
-            "\n\t => res content:",
-            content,
-        );
+        DEBUG.LOG_CATCH_RESPONSE &&
+            logger.log(
+                "get response content",
+                "\n\t => request url:",
+                req_url,
+                "\n\t => res content:",
+                content,
+            );
 
         // #cure-warn 根据响应的 URL、当前阅读模式等等，处理响应内容
-        handle_response(req_url!, content, "stream");
-
-        await send_fetch_fulfill_request(tabId, temp);
+        try {
+            handle_response(req_url!, content, "stream");
+        } catch (e) {
+            logger.error("handle response error", e);
+        } finally {
+            await send_fetch_fulfill_request(tabId, temp);
+        }
     }
 });
 
@@ -179,29 +191,86 @@ function should_decode_res(req_url: string) {
 
 // #region handle response
 
+/** 根据请求链接来处理特定的内容 */
 function handle_response(url: string, content: string, mode: ReadMode) {
-    // 无论何种模式，书籍的基础信息（书名等）是一样的
-    const r = target_api.BOOK_INFO.urlpattern.exec(url);
-    if (r !== null) {
-        const bid = r.search.groups["bid"];
-        if (bid === undefined) {
-            logger.error("get book id from url failed. url: ", url);
-        }
-        if (!CureWhbyBookManager.save_book_data(content)) {
-            logger.error("save book data failed, content:", content);
-        }
+    // 因为后期会有大量的关于书籍内容的请求，所以将它放在开头哟，尽可能避免多余的判断
+    if (handle_book_content(url, content)) {
         return;
     }
 
-    // 处理书籍内容
-    switch (mode) {
-        case "origin":
-            break;
-        case "stream":
-            break;
-        default:
-            throw new Error("unknown read mode");
+    if (handle_book_simple_data(url, content)) {
+        return;
     }
+
+    if (handle_book_catalog(url, content)) {
+        return;
+    }
+}
+
+/** 返回 true 表示处理过了 */
+function handle_book_simple_data(url: string, content: string) {
+    const is_book_simple_data =
+        target_api.BOOK_SIMPLE_DATA.urlpattern.exec(url);
+    if (is_book_simple_data === null) {
+        return false;
+    }
+
+    const bid = is_book_simple_data.search.groups["bid"];
+    if (bid === undefined) {
+        logger.error("get book id from url failed. url: ", url);
+        return false;
+    }
+
+    if (!CureWhbyBookManager.save_book_simple_data(content)) {
+        logger.error("save_book_simple_data failed, content:", content);
+    }
+
+    return true;
+}
+
+/** 返回 true 表示处理过了 */
+function handle_book_catalog(url: string, content: string) {
+    let bid: string | undefined = undefined;
+
+    // 从 url 中提取出 bid，从这里也可以判断出当前网站所处的阅读模式？
+    const is_book_pdf_catalog =
+        target_api.BOOK_PDF_MODE_CATALOG.urlpattern.exec(url);
+    // pdf mode
+    if (is_book_pdf_catalog !== null) {
+        bid = is_book_pdf_catalog.search.groups["bid"];
+        if (bid === undefined) {
+            logger.error("get book id from pdf catalog url failed. url: ", url);
+        }
+    }
+    // epub mode
+    else {
+        const is_book_epub_catalog =
+            target_api.BOOK_EPUB_MODE_CATALOG.urlpattern.exec(url);
+        if (is_book_epub_catalog !== null) {
+            bid = is_book_epub_catalog.pathname.groups["bid"];
+            if (bid === undefined) {
+                logger.error(
+                    "get book id from epub catalog url failed. url: ",
+                    url,
+                );
+            }
+        }
+    }
+
+    if (bid === undefined) {
+        return false;
+    }
+
+    if (!CureWhbyBookManager.save_book_catalog(bid, content)) {
+        logger.error("save_book_catalog failed, content:", content);
+    }
+
+    return true;
+}
+
+/** 返回 true 表示处理过了 */
+function handle_book_content(url: string, content: string) {
+    return false;
 }
 
 // #endregion

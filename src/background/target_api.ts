@@ -10,7 +10,7 @@ export const BOOK_HOST = "wqbook.wqxuetang.com";
  *
  */
 
-export const BOOK_INFO: TargetAPI = {
+export const BOOK_SIMPLE_DATA: TargetAPI = {
     fetch_req_pattern: {
         urlPattern: "*read/initread\?bid=*",
         resourceType: "XHR",
@@ -37,7 +37,10 @@ export const BOOK_PDF_MODE_CATALOG: TargetAPI = {
         resourceType: "XHR",
         requestStage: "Response",
     },
-    urlpattern: new URLPattern({ pathname: "/deep/book/v1/catatree" }),
+    urlpattern: new URLPattern({
+        pathname: "/deep/book/v1/catatree",
+        search: "bid=:bid",
+    }),
 };
 
 // #endregion
