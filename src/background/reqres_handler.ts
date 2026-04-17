@@ -25,6 +25,7 @@ export async function start_debugger(tabId: number) {
             target_api.BOOK_SIMPLE_DATA.fetch_req_pattern,
             // pdf
             target_api.BOOK_PDF_MODE_CATALOG.fetch_req_pattern,
+            target_api.BOOK_PDF_MODE_SPLIT_IMAGE.fetch_req_pattern,
             // epub
             target_api.BOOK_EPUB_MODE_CATALOG.fetch_req_pattern,
             target_api.BOOK_EPUB_MODE_ONE_PAGE.fetch_req_pattern,
@@ -270,7 +271,86 @@ function handle_book_catalog(url: string, content: string) {
 
 /** 返回 true 表示处理过了 */
 function handle_book_content(url: string, content: string) {
-    return false;
+    let handled = false;
+
+    const is_pdf_book_content =
+        target_api.BOOK_PDF_MODE_SPLIT_IMAGE.urlpattern.exec(url);
+    // pdf mode
+    if (is_pdf_book_content !== null) {
+        const bid = is_pdf_book_content.pathname.groups["bid"];
+        const page = is_pdf_book_content.pathname.groups["page"];
+
+        if (bid !== undefined && page !== undefined) {
+            handle_pdf_book_content(bid, parseInt(page), content);
+        } else {
+            logger.error(
+                "get book page info from pdf book content url failed. url: ",
+                url,
+            );
+        }
+
+        handled = true;
+    }
+    // epub mode
+    else {
+        const is_epub_book_content =
+            target_api.BOOK_EPUB_MODE_ONE_PAGE.urlpattern.exec(url);
+        if (is_epub_book_content !== null) {
+            const bid = is_epub_book_content.pathname.groups["bid"];
+            const page = is_epub_book_content.pathname.groups["page"];
+            const chapter = is_epub_book_content.pathname.groups["chapter"];
+            const filename = is_epub_book_content.pathname.groups["filename"];
+
+            if (
+                bid !== undefined &&
+                page !== undefined &&
+                chapter !== undefined &&
+                filename !== undefined
+            ) {
+                handle_epub_book_content(
+                    bid,
+                    parseInt(page),
+                    parseInt(chapter),
+                    filename,
+                    content,
+                );
+            } else {
+                logger.error(
+                    "get book page info from epub book content url failed. url: ",
+                    url,
+                );
+            }
+
+            handled = true;
+        }
+    }
+
+    return handled;
+}
+
+/** 处理流式阅读模式中 epub book 的一页内容 */
+function handle_epub_book_content(
+    bid: string,
+    page: number,
+    chapter: number,
+    filename: string,
+    content: string,
+) {
+    logger.log(
+        "get epub book content.",
+        "bid:",
+        bid,
+        ", page:",
+        page,
+        ", chapter:",
+        chapter,
+        ", filename:",
+        filename,
+    );
+}
+
+function handle_pdf_book_content(bid: string, page: number, content: string) {
+    logger.log("get pdf book content.", "bid:", bid, ", page:", page);
 }
 
 // #endregion

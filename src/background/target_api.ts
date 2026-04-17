@@ -43,6 +43,30 @@ export const BOOK_PDF_MODE_CATALOG: TargetAPI = {
     }),
 };
 
+/** 在【原貌阅读模式】中，每一页内容的被拆分成了 6 个小图片
+ *
+ * 形如 `https://wqbook.wqxuetang.com/deep/page/lmg/3226417/5?k=...`
+ *
+ * 其中 `3226417/5` 是书籍的 id 和其中当前所在的页数，
+ * 那么怎么知道 6 个小图片的拼接顺序？
+ * 1. 从渲染后的网页中读取顺序
+ * 2. 根据请求之间的关系，找出顺序
+ * 3. 图片识别，判断相连性，找出顺序
+ *
+ * 暂时还不确定，先暂停
+ *
+ */
+export const BOOK_PDF_MODE_SPLIT_IMAGE: TargetAPI = {
+    fetch_req_pattern: {
+        urlPattern: "*deep/page/lmg*",
+        resourceType: "Image",
+        requestStage: "Response",
+    },
+    urlpattern: new URLPattern({
+        pathname: "/deep/page/lmg/:bid/:page",
+    }),
+};
+
 // #endregion
 
 // #region 流式阅读模式相关的 API
