@@ -2,6 +2,7 @@
 
 import { BookStorageHelper } from "@/share/storage";
 import CureLogger from "@/share/logger";
+import CryptoJS from "crypto-js";
 
 const logger = new CureLogger("book_manager");
 
@@ -104,6 +105,119 @@ export abstract class CureWhbyBookManager {
         return result;
     }
 
+    static async save_epub_one_page(
+        bid: string,
+        page: number,
+        chapter: number,
+        filename: string,
+        content: string,
+    ) {
+        const new_content = EpubModeHelper.decrypt(content);
+        logger.log("save epub one page:", new_content);
+    }
+
     /** 当获取全部内容时，下载书籍到本地 */
     abstract download_book(): void;
+}
+
+/** 在流式阅读模式中，辅助获取书籍内容 */
+abstract class EpubModeHelper {
+    /** 书籍内容是被加密的，此处解密后得到 epub 一页内容
+     *
+     * 根据网站的代码，此处使用 CryptoJS 解密
+     */
+    static decrypt(content: string) {
+        const bytes = this.base64_to_bytes(content);
+        const header_pattern_one = new Uint8Array([
+            0x0, 0xd, 0xe, 0xe, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0,
+        ]);
+        const header_pattern_two = new Uint8Array([
+            0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0,
+        ]);
+        const res_suffix = bytes.slice(bytes.length - 0x4, bytes.length);
+
+        const dpbt_value = this.dpbt(res_suffix);
+        const len = bytes.length - 0x4 - dpbt_value;
+        const key = bytes.slice(len, bytes.length - 0x4);
+        const encrypted_data = CryptoJS.lib.WordArray.create(
+            bytes.slice(0xa, len),
+        );
+
+        const base64_encrypted_data =
+            CryptoJS.enc.Base64.stringify(encrypted_data);
+
+        if (
+            bytes[0x1] === header_pattern_one[0x1] &&
+            bytes[0x2] === header_pattern_one[0x2] &&
+            bytes[0x3] === header_pattern_one[0x3]
+        ) {
+            return this.raw_decrypt(base64_encrypted_data, key);
+        } else if (
+            bytes[0x1] === header_pattern_two[0x1] &&
+            bytes[0x2] === header_pattern_two[0x2] &&
+            bytes[0x3] === header_pattern_two[0x3]
+        ) {
+            // #cure-question 不知道什么情况
+            logger.error("header pattern two:", content);
+            return this.raw_decrypt(dpbt_value);
+        } else {
+            // #cure-question 不知道什么情况
+            logger.error("header pattern unknown:", content);
+            return this.raw_decrypt(bytes);
+        }
+    }
+
+    private static dpbt(input_arr: Uint8Array) {
+        const result = new Uint8Array(4);
+        let result_index = result.length - 1;
+        let input_index = input_arr.length - 1;
+        for (; result_index >= 0; result_index--, input_index--) {
+            if (input_index >= 0) {
+                result[result_index] = input_arr[input_index];
+            } else {
+                result[result_index] = 0;
+            }
+        }
+        const byte1 = (result[0] & 0xff) << 0x18;
+        const byte2 = (result[1] & 0xff) << 0x10;
+        const byte3 = (result[2] & 0xff) << 0x8;
+        const byte4 = result[3] & 0xff;
+        return byte1 + byte2 + byte3 + byte4;
+    }
+
+    private static raw_decrypt(data: any, key?: Uint8Array) {
+        const utf_decoder = new TextDecoder("utf-8");
+        if (key === undefined) {
+            return utf_decoder.decode(data);
+        }
+
+        const key1 = utf_decoder.decode(key.slice(0, 16));
+        const parsed_key1 = CryptoJS.enc.Utf8.parse(key1);
+
+        const key2 = CryptoJS.enc.Base64.stringify(
+            CryptoJS.lib.WordArray.create(key.slice(16 - key.length)),
+        );
+
+        const key3 = CryptoJS.enc.Utf8.stringify(
+            CryptoJS.AES.decrypt(key2, parsed_key1, {
+                mode: CryptoJS.mode.ECB,
+                padding: CryptoJS.pad.Pkcs7,
+            }),
+        );
+        const parsed_key3 = CryptoJS.enc.Utf8.parse(key3);
+
+        const decrypted_data = CryptoJS.enc.Utf8.stringify(
+            CryptoJS.AES.decrypt(data, parsed_key3, {
+                mode: CryptoJS.mode.ECB,
+                padding: CryptoJS.pad.Pkcs7,
+            }),
+        );
+
+        return decrypted_data;
+    }
+
+    /** 将 base64 encode 的内容转为 bytes */
+    private static base64_to_bytes(str: string) {
+        return Uint8Array.from(atob(str), (c) => c.charCodeAt(0));
+    }
 }

@@ -91,6 +91,8 @@ chrome.debugger.onEvent.addListener(async (source, method, params) => {
     // response state
     else {
         const response = await get_req_response(tabId, requestId);
+        // 获取响应内容之后立即放开拦截
+        await send_fetch_fulfill_request(tabId, temp);
         const content = should_decode_res(req_url!)
             ? base64_decode_to_utf8(response.body)
             : response.body;
@@ -106,11 +108,9 @@ chrome.debugger.onEvent.addListener(async (source, method, params) => {
 
         // #cure-warn 根据响应的 URL、当前阅读模式等等，处理响应内容
         try {
-            handle_response(req_url!, content, "stream");
+            await handle_response(req_url!, content, "stream");
         } catch (e) {
             logger.error("handle response error", e);
-        } finally {
-            await send_fetch_fulfill_request(tabId, temp);
         }
     }
 });
@@ -193,23 +193,23 @@ function should_decode_res(req_url: string) {
 // #region handle response
 
 /** 根据请求链接来处理特定的内容 */
-function handle_response(url: string, content: string, mode: ReadMode) {
+async function handle_response(url: string, content: string, mode: ReadMode) {
     // 因为后期会有大量的关于书籍内容的请求，所以将它放在开头哟，尽可能避免多余的判断
-    if (handle_book_content(url, content)) {
+    if (await handle_book_content(url, content)) {
         return;
     }
 
-    if (handle_book_simple_data(url, content)) {
+    if (await handle_book_simple_data(url, content)) {
         return;
     }
 
-    if (handle_book_catalog(url, content)) {
+    if (await handle_book_catalog(url, content)) {
         return;
     }
 }
 
 /** 返回 true 表示处理过了 */
-function handle_book_simple_data(url: string, content: string) {
+async function handle_book_simple_data(url: string, content: string) {
     const is_book_simple_data =
         target_api.BOOK_SIMPLE_DATA.urlpattern.exec(url);
     if (is_book_simple_data === null) {
@@ -222,7 +222,7 @@ function handle_book_simple_data(url: string, content: string) {
         return false;
     }
 
-    if (!CureWhbyBookManager.save_book_simple_data(content)) {
+    if (!(await CureWhbyBookManager.save_book_simple_data(content))) {
         logger.error("save_book_simple_data failed, content:", content);
     }
 
@@ -230,7 +230,7 @@ function handle_book_simple_data(url: string, content: string) {
 }
 
 /** 返回 true 表示处理过了 */
-function handle_book_catalog(url: string, content: string) {
+async function handle_book_catalog(url: string, content: string) {
     let bid: string | undefined = undefined;
 
     // 从 url 中提取出 bid，从这里也可以判断出当前网站所处的阅读模式？
@@ -262,7 +262,7 @@ function handle_book_catalog(url: string, content: string) {
         return false;
     }
 
-    if (!CureWhbyBookManager.save_book_catalog(bid, content)) {
+    if (!(await CureWhbyBookManager.save_book_catalog(bid, content))) {
         logger.error("save_book_catalog failed, content:", content);
     }
 
@@ -270,7 +270,7 @@ function handle_book_catalog(url: string, content: string) {
 }
 
 /** 返回 true 表示处理过了 */
-function handle_book_content(url: string, content: string) {
+async function handle_book_content(url: string, content: string) {
     let handled = false;
 
     const is_pdf_book_content =
@@ -281,7 +281,7 @@ function handle_book_content(url: string, content: string) {
         const page = is_pdf_book_content.pathname.groups["page"];
 
         if (bid !== undefined && page !== undefined) {
-            handle_pdf_book_content(bid, parseInt(page), content);
+            await handle_pdf_book_content(bid, parseInt(page), content);
         } else {
             logger.error(
                 "get book page info from pdf book content url failed. url: ",
@@ -307,7 +307,7 @@ function handle_book_content(url: string, content: string) {
                 chapter !== undefined &&
                 filename !== undefined
             ) {
-                handle_epub_book_content(
+                await handle_epub_book_content(
                     bid,
                     parseInt(page),
                     parseInt(chapter),
@@ -329,7 +329,7 @@ function handle_book_content(url: string, content: string) {
 }
 
 /** 处理流式阅读模式中 epub book 的一页内容 */
-function handle_epub_book_content(
+async function handle_epub_book_content(
     bid: string,
     page: number,
     chapter: number,
@@ -347,9 +347,20 @@ function handle_epub_book_content(
         ", filename:",
         filename,
     );
+    await CureWhbyBookManager.save_epub_one_page(
+        bid,
+        page,
+        chapter,
+        filename,
+        content,
+    );
 }
 
-function handle_pdf_book_content(bid: string, page: number, content: string) {
+async function handle_pdf_book_content(
+    bid: string,
+    page: number,
+    content: string,
+) {
     logger.log("get pdf book content.", "bid:", bid, ", page:", page);
 }
 
