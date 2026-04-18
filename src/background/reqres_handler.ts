@@ -46,7 +46,7 @@ export async function stop_debugger(tabId: number) {
     } catch {}
 }
 
-// #cure--test 点击图标启动调试来进行测试
+// #cure-test 点击图标启动调试来进行测试
 chrome.action.onClicked.addListener(async (tab) => {
     if (tab.id === undefined) {
         return;
@@ -108,7 +108,7 @@ chrome.debugger.onEvent.addListener(async (source, method, params) => {
 
         // #cure-warn 根据响应的 URL、当前阅读模式等等，处理响应内容
         try {
-            await handle_response(req_url!, content, "stream");
+            await handle_response(req_url!, content, "epub");
         } catch (e) {
             logger.error("handle response error", e);
         }

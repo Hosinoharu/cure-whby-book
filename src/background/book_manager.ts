@@ -3,8 +3,9 @@
 import { BookStorageHelper } from "@/share/storage";
 import CureLogger from "@/share/logger";
 import CryptoJS from "crypto-js";
+import CureBookPageDB from "@/share/book_page_db";
 
-const logger = new CureLogger("book_manager");
+const logger = new CureLogger("bg/book_manager");
 
 /** 管理一本书籍的相关信息，包括下载等等 */
 export abstract class CureWhbyBookManager {
@@ -113,7 +114,16 @@ export abstract class CureWhbyBookManager {
         content: string,
     ) {
         const new_content = EpubModeHelper.decrypt(content);
-        logger.log("save epub one page:", new_content);
+        await CureBookPageDB.Instance.save_one_page(
+            bid,
+            "epub",
+            page,
+            new_content,
+            chapter,
+            filename,
+        );
+        // #cure-test 不知道为什么，调试工具不显示插件创建的 indexedDB？？？
+        await CureBookPageDB.Instance.show_all_data();
     }
 
     /** 当获取全部内容时，下载书籍到本地 */

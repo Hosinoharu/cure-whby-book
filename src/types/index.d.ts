@@ -1,10 +1,10 @@
 /// <reference types="devtools-protocol" />
 
 /** 对应网站中读书的阅读模式
- * - origin: 原貌模式
- * - stream: 流式模式
+ * - pdf: 原貌模式
+ * - epub: 流式模式
  */
-type ReadMode = "origin" | "stream";
+type ReadMode = "pdf" | "epub";
 
 type TargetAPI = {
     /** 用于指定让插件拦截特定的请求 */
