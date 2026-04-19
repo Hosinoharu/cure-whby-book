@@ -6,6 +6,10 @@ import CryptoJS from "crypto-js";
 import CureBookPageDB from "@/share/book_page_db";
 
 const logger = new CureLogger("bg/book_manager");
+const DEBUG = {
+    /** 在保存一页内容后，输出底层数据库的所有内容，仅用于调试哟 */
+    LOG_ALL_BOOK_PAGES: false,
+};
 
 /** 管理一本书籍的相关信息，包括下载等等 */
 export abstract class CureWhbyBookManager {
@@ -18,7 +22,9 @@ export abstract class CureWhbyBookManager {
     }
 
     /** 保存书籍的基础数据，成功则返回 true */
-    static async save_book_simple_data(str_book_data: string) {
+    static async save_book_simple_data(
+        str_book_data: string,
+    ): Promise<boolean> {
         const res = JSON.parse(str_book_data);
         if (this.check_book_data(res.code, "response code is null") !== 0) {
             return false;
@@ -47,7 +53,10 @@ export abstract class CureWhbyBookManager {
     }
 
     /** 保存书籍的目录数据，成功则返回 true */
-    static async save_book_catalog(bid: string, str_book_catalog: string) {
+    static async save_book_catalog(
+        bid: string,
+        str_book_catalog: string,
+    ): Promise<boolean> {
         const res = JSON.parse(str_book_catalog);
         if (this.check_book_data(res.code, "response code is null") !== 0) {
             return false;
@@ -57,11 +66,9 @@ export abstract class CureWhbyBookManager {
             res.data,
             "response book data is null",
         );
-        const old_book_data = await BookStorageHelper.get_book_data(bid);
-        if (!old_book_data) {
-            logger.error("save_book_catalog failed: old_book_data is null");
-            return false;
-        }
+        // #cure-warn 因为请求的先后顺序可能不同，所以可能还没有保存书籍的基础数据
+        const old_book_data =
+            (await BookStorageHelper.get_book_data(bid)) || ({} as OneBookData);
 
         const catalog: BookCatalogNode[] = this.format_catalog(raw_data);
         const book_data: OneBookData = {
@@ -112,9 +119,9 @@ export abstract class CureWhbyBookManager {
         chapter: number,
         filename: string,
         content: string,
-    ) {
+    ): Promise<boolean> {
         const new_content = EpubModeHelper.decrypt(content);
-        await CureBookPageDB.Instance.save_one_page(
+        const ok = await CureBookPageDB.Instance.save_one_page(
             bid,
             "epub",
             page,
@@ -122,8 +129,10 @@ export abstract class CureWhbyBookManager {
             chapter,
             filename,
         );
-        // #cure-test 不知道为什么，调试工具不显示插件创建的 indexedDB？？？
-        await CureBookPageDB.Instance.show_all_data();
+        // #cure-question 不知道为什么，调试工具不显示插件创建的 indexedDB？？？
+        DEBUG.LOG_ALL_BOOK_PAGES &&
+            (await CureBookPageDB.Instance.show_all_data());
+        return ok;
     }
 
     /** 当获取全部内容时，下载书籍到本地 */

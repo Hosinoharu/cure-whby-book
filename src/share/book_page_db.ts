@@ -64,6 +64,8 @@ export default class CureBookPageDB {
                     });
                     // 后续会通过 book id 来查找，所以需要建立索引
                     obs.createIndex("bid", "bid", { unique: false });
+                    // 作为页面的唯一标识，需要建立索引，避免重复添加
+                    obs.createIndex("unique_id", "unique_id", { unique: true });
                     obs.transaction.oncomplete = () => {
                         resolve();
                     };
@@ -153,8 +155,18 @@ export default class CureBookPageDB {
                 resolve(true);
             };
             req.onerror = (e) => {
+                const err = (e.target as IDBRequest).error;
+                if (
+                    err?.name === "ConstraintError" &&
+                    err?.message.includes("unique_id")
+                ) {
+                    DEBUG.LOG_ADD_PAGE_DATA &&
+                        logger.warn("save_epub_one_page data exist", data);
+
+                    return resolve(true);
+                }
                 logger.error("save_one_epub_page failed", e);
-                reject(false);
+                reject(err?.message);
             };
         });
     }

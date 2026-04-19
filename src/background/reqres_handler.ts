@@ -11,6 +11,8 @@ const DEBUG = {
     LOG_ALL_CDP_MSG: false,
     /** 输出插件拦截捕获的响应内容 */
     LOG_CATCH_RESPONSE: false,
+    /** 输出保存书籍内容时的日志，比如是第几页等，不会输出要保存的页内容哟 */
+    LOG_SAVE_BOOK_CONTENT: true,
 };
 
 /** 监听特定标签页的请求与响应 */
@@ -336,24 +338,39 @@ async function handle_epub_book_content(
     filename: string,
     content: string,
 ) {
-    logger.log(
-        "get epub book content.",
-        "bid:",
-        bid,
-        ", page:",
-        page,
-        ", chapter:",
-        chapter,
-        ", filename:",
-        filename,
-    );
-    await CureWhbyBookManager.save_epub_one_page(
-        bid,
-        page,
-        chapter,
-        filename,
-        content,
-    );
+    DEBUG.LOG_SAVE_BOOK_CONTENT &&
+        logger.log(
+            "get epub book content",
+            "bid:",
+            bid,
+            ", page:",
+            page,
+            ", chapter:",
+            chapter,
+            ", filename:",
+            filename,
+        );
+    if (
+        !(await CureWhbyBookManager.save_epub_one_page(
+            bid,
+            page,
+            chapter,
+            filename,
+            content,
+        ))
+    ) {
+        logger.error(
+            "save_epub_one_page failed",
+            "bid:",
+            bid,
+            ", page:",
+            page,
+            ", chapter:",
+            chapter,
+            ", filename:",
+            filename,
+        );
+    }
 }
 
 async function handle_pdf_book_content(
@@ -361,7 +378,8 @@ async function handle_pdf_book_content(
     page: number,
     content: string,
 ) {
-    logger.log("get pdf book content.", "bid:", bid, ", page:", page);
+    DEBUG.LOG_SAVE_BOOK_CONTENT &&
+        logger.log("get pdf book content.", "bid:", bid, ", page:", page);
 }
 
 // #endregion
