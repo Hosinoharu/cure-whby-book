@@ -8,6 +8,8 @@ import { BOOK_HOST, BOOK_SIMPLE_DATA, BOOK_CATALOG } from "./target_api";
 
 const logger = new CureLogger("bg/book_manager");
 const DEBUG = {
+    /** 输出获取到的书籍信息 */
+    LOG_BOOK_DATA: true,
     /** 在保存一页内容后，输出底层数据库的所有内容，仅用于调试哟 */
     LOG_ALL_BOOK_PAGES: false,
 };
@@ -59,6 +61,20 @@ export abstract class CureWhbyBookManager {
             pub: this.check_book_data(raw_data.pub, "book pub is null"),
             catalog: await this.get_book_catalog(bid),
         };
+
+        DEBUG.LOG_BOOK_DATA &&
+            logger.log(
+                "get book data",
+                "bid:",
+                bid,
+                ", name:",
+                book_data.name,
+                ", author:",
+                book_data.author,
+                ", pages:",
+                book_data.pages,
+            );
+
         await BookStorageHelper.add_book_data(book_data);
         return true;
     }

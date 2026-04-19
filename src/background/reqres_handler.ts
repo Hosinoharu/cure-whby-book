@@ -12,7 +12,7 @@ const DEBUG = {
     /** 输出插件拦截捕获的响应内容 */
     LOG_CATCH_RESPONSE: false,
     /** 输出保存书籍内容时的日志，比如是第几页等，不会输出要保存的页内容哟 */
-    LOG_SAVE_BOOK_CONTENT: true,
+    LOG_SAVE_BOOK_CONTENT: false,
 };
 
 /** 监听特定标签页的请求与响应 */
@@ -51,9 +51,21 @@ chrome.action.onClicked.addListener(async (tab) => {
         return;
     }
     logger.log("debugger start", tab.title, " - ", tab.url);
-    // #cure-test 测试直接请求 API 获取书籍信息
-    // await start_debugger(tab.id);
-    CureWhbyBookManager.save_book_simple_data("3244419");
+    await start_debugger(tab.id);
+
+    // #cure-test/warn 在阅读页面开启插件功能
+    // https://wqbook.wqxuetang.com/deep/read/epub?bid=3244419
+    // https://wqbook.wqxuetang.com/deep/read/pdf?bid=3244419
+    // 从 url 中提取对应的 bid，然后获取书籍的基础信息咯
+    const url = new URL(tab.url || "");
+    const bid = url.searchParams.get("bid");
+    if (bid) {
+        if (!CureWhbyBookManager.save_book_simple_data(bid)) {
+            logger.error("save book simple data error", bid);
+        }
+    } else {
+        logger.error("can not get bid from url", tab.url);
+    }
 });
 
 // #cure-tip 监听 cdp 消息并重写响应

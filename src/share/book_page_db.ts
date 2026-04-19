@@ -5,7 +5,7 @@ import CureLogger from "./logger";
 const logger = new CureLogger("book_page_db");
 const DEBUG = {
     /** 输出添加的页面内容 */
-    LOG_ADD_PAGE_DATA: true,
+    LOG_ADD_PAGE_DATA: false,
 };
 
 /** 书籍内容存储 —— 单例模式
