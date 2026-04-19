@@ -17,25 +17,47 @@ export const BOOK_HOST = "https://wqbook.wqxuetang.com";
  */
 export const BOOK_SIMPLE_DATA = `${BOOK_HOST}/api/v7/book/initbook?bid=`;
 
-// #region 原貌阅读模式相关的 API
+/** 获取书籍目录的 API。
+ *
+ * 在阅读书籍时，有两种不同的 API 获取书籍目录
+ * - 【原貌阅读模式】，访问 API `https://wqbook.wqxuetang.com/deep/book/v1/catatree?bid=3226417`
+ * - 【流式阅读模式】，访问 API `https://wqbook.wqxuetang.com/deep/epub/catatree/3244419?k=...`
+ *
+ * 它们的响应内容大致相同，所以可以根据第一个 API 获取目录信息，
+ * 没错，也是直接访问，毕竟不是什么敏感信息。
+ *
+ * # 原貌阅读模式
+ * ```json
+    {
+        "id": "1153202979583557633",
+        "pid": "0",
+        "label": "参考文献",
+        "pnum": "517",
+        "level": "1",
+        "isLeaf": true,
+        "children": null
+    }
+ * ```
 
-/**  在【原貌阅读模式】中，获取书籍目录的 API。
+ * # 流式阅读模式
+ * ```json
+    {
+        "id": 307,
+        "pid": 0,
+        "level": 1,
+        "pnum": 307,
+        "label": "参考文献",
+        "src": "",
+        "srcNew": "",
+        "isLeaf": true,
+        "key": "73e41dbc5799406b",
+        "children": null,
+        "files": null
+    }
+ * ```
  *
- * 形如 `https://wqbook.wqxuetang.com/deep/book/v1/catatree?bid=3226417`
- *
- * 其中 `bid` 是书籍的 id
  */
-export const BOOK_PDF_MODE_CATALOG: TargetAPI = {
-    fetch_req_pattern: {
-        urlPattern: "*deep/book/v1/catatree*",
-        resourceType: "XHR",
-        requestStage: "Response",
-    },
-    urlpattern: new URLPattern({
-        pathname: "/deep/book/v1/catatree",
-        search: "bid=:bid",
-    }),
-};
+export const BOOK_CATALOG = `${BOOK_HOST}/deep/book/v1/catatree?bid=`;
 
 /** 在【原貌阅读模式】中，每一页内容的被拆分成了 6 个小图片
  *
@@ -61,25 +83,6 @@ export const BOOK_PDF_MODE_SPLIT_IMAGE: TargetAPI = {
     }),
 };
 
-// #endregion
-
-// #region 流式阅读模式相关的 API
-
-/**  在【流式阅读模式】中，获取书籍目录的 API。
- *
- * 形如 `https://wqbook.wqxuetang.com/deep/epub/catatree/3244419?k=...`
- *
- * 其中 `3244419` 是书籍的 id
- */
-export const BOOK_EPUB_MODE_CATALOG: TargetAPI = {
-    fetch_req_pattern: {
-        urlPattern: "*deep/epub/catatree*",
-        resourceType: "XHR",
-        requestStage: "Response",
-    },
-    urlpattern: new URLPattern({ pathname: "/deep/epub/catatree/:bid" }),
-};
-
 /** 在【流式阅读模式】中，每一页内容的 API
  *
  * 形如 `https://wqbook.wqxuetang.com/deep/epub/read/3244419/6/0/preface3.xhtml?k=...`
@@ -101,5 +104,3 @@ export const BOOK_EPUB_MODE_ONE_PAGE: TargetAPI = {
         pathname: "/deep/epub/read/:bid/:page/:chapter/:filename",
     }),
 };
-
-// #endregion

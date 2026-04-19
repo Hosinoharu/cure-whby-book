@@ -4,7 +4,7 @@ import { BookStorageHelper } from "@/share/storage";
 import CureLogger from "@/share/logger";
 import CryptoJS from "crypto-js";
 import CureBookPageDB from "@/share/book_page_db";
-import { BOOK_HOST, BOOK_SIMPLE_DATA } from "./target_api";
+import { BOOK_HOST, BOOK_SIMPLE_DATA, BOOK_CATALOG } from "./target_api";
 
 const logger = new CureLogger("bg/book_manager");
 const DEBUG = {
@@ -26,7 +26,9 @@ export abstract class CureWhbyBookManager {
     static async save_book_simple_data(bid: string): Promise<boolean> {
         const url = BOOK_SIMPLE_DATA + bid;
         const response = await fetch(url, {
-            referrer: `${BOOK_HOST}/book/${bid}`,
+            headers: {
+                referer: `${BOOK_HOST}/book/${bid}`,
+            },
         });
         const res = await response.json();
 
@@ -39,10 +41,8 @@ export abstract class CureWhbyBookManager {
             res.data,
             "response book data is null",
         );
-        const old_book_data = await BookStorageHelper.get_book_data(bid);
+
         const book_data: OneBookData = {
-            // 记得保留原始数据
-            ...old_book_data,
             bid,
             name: this.check_book_data(raw_data.name, "book name is null"),
             author: this.check_book_data(
@@ -57,37 +57,31 @@ export abstract class CureWhbyBookManager {
             date: this.check_book_data(raw_data.date, "book date is null"),
             isbn: this.check_book_data(raw_data.isbn, "book isbn is null"),
             pub: this.check_book_data(raw_data.pub, "book pub is null"),
+            catalog: await this.get_book_catalog(bid),
         };
         await BookStorageHelper.add_book_data(book_data);
         return true;
     }
 
-    /** 保存书籍的目录数据，成功则返回 true */
-    static async save_book_catalog(
+    /** 获取书籍的目录数据 */
+    private static async get_book_catalog(
         bid: string,
-        str_book_catalog: string,
-    ): Promise<boolean> {
-        const res = JSON.parse(str_book_catalog);
+    ): Promise<BookCatalogNode[]> {
+        const url = BOOK_CATALOG + bid;
+        const response = await fetch(url, {
+            headers: {
+                referer: `${BOOK_HOST}/book/${bid}`,
+            },
+        });
+        const res = await response.json();
+
         if (this.check_book_data(res.code, "response code is null") !== 0) {
-            return false;
+            return [];
         }
 
-        const raw_data = this.check_book_data(
-            res.data,
-            "response book data is null",
+        return this.format_catalog(
+            this.check_book_data(res.data, "response book data is null"),
         );
-        // #cure-warn 因为请求的先后顺序可能不同，所以可能还没有保存书籍的基础数据
-        const old_book_data =
-            (await BookStorageHelper.get_book_data(bid)) || ({} as OneBookData);
-
-        const catalog: BookCatalogNode[] = this.format_catalog(raw_data);
-        const book_data: OneBookData = {
-            // 记得保留原始数据
-            ...old_book_data,
-            catalog,
-        };
-        await BookStorageHelper.add_book_data(book_data);
-        return true;
     }
 
     /** 统一将将书签格式化
@@ -100,15 +94,11 @@ export abstract class CureWhbyBookManager {
         // #cure-warn 该 node 的格式根据实际响应而定
         for (const node of nodes) {
             const item: BookCatalogNode = {
-                id: this.check_book_data(String(node.id), "node id is null"),
-                pid: this.check_book_data(String(node.pid), "node pid is null"),
+                id: this.check_book_data(node.id, "node id is null"),
+                pid: this.check_book_data(node.pid, "node pid is null"),
                 label: this.check_book_data(node.label, "node label is null"),
-                level: parseInt(
-                    this.check_book_data(node.level, "node level is null"),
-                ),
-                pnum: parseInt(
-                    this.check_book_data(node.pnum, "node pnum is null"),
-                ),
+                level: this.check_book_data(node.level, "node level is null"),
+                pnum: this.check_book_data(node.pnum, "node pnum is null"),
                 isLeaf: this.check_book_data(
                     node.isLeaf,
                     "node isLeaf is null",

@@ -27,49 +27,16 @@ type OneBookSimpleData = {
     date: string;
     /** 出版社 */
     pub: string;
+    /** 书籍的目录信息 */
+    catalog?: BookCatalogNode[];
 };
 
-/** 统一表示书籍的书签
- * 
- * # 原貌阅读模式中
- * 一个书签组成如下
- * ```json
-    {
-        "id": "281474976645121",
-        "pid": "0",
-        "label": "封面",
-        "pnum": "1",
-        "level": "1",
-        "isLeaf": true,
-        "children": null
-    }
- * ```
- *
- * # 流式阅读模式中
- * 一个书签组成如下
- * ```json
-    {
-        "children": null,
-        "files": null,
-        "id": 1,
-        "isLeaf": true,
-        "key": "1fa936a24002ca99",
-        "label": "封面页",
-        "level": 1,
-        "pid": 0,
-        "pnum": 1,
-        "src": "7737104E7E0A88025B2642ED70AC29CA130C727734C9E7330A1D0D88C0C09347",
-        "srcNew": ""
-    }
- * ```
- */
+/** 统一表示书籍的书签 */
 type BookCatalogNode = {
-    /** 书签节点 ID.
-     * 因为不同模式下这个 id 可能很长，所以用字符串表示
-     */
-    id: string;
-    /** 父书签 ID。为字符串 0 表示顶层书签 */
-    pid: string;
+    /** 书签节点 ID */
+    id: number;
+    /** 父书签 ID。为 0 表示顶层书签 */
+    pid: number;
     /** 书签层级 */
     level: number;
     /** 书签对应的页数 */

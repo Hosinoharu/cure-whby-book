@@ -9,8 +9,6 @@ type StorageStruct = {
 type OneBookData = OneBookSimpleData & {
     /** 已经下载的页数 */
     downloaded_pages?: number[];
-    /** 书籍的目录信息 */
-    catalog?: BookCatalogNode[];
 };
 
 /** 存储书籍内容到数据库中时，表示一项数据（也就是一页的内容） */

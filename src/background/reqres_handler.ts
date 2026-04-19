@@ -25,10 +25,8 @@ export async function start_debugger(tabId: number) {
         // 不同阅读模式下，需要拦截的资源不同，这里直接拦截【所有可能需要的资源好了】
         const patterns: Protocol.Fetch.RequestPattern[] = [
             // pdf
-            target_api.BOOK_PDF_MODE_CATALOG.fetch_req_pattern,
             target_api.BOOK_PDF_MODE_SPLIT_IMAGE.fetch_req_pattern,
             // epub
-            target_api.BOOK_EPUB_MODE_CATALOG.fetch_req_pattern,
             target_api.BOOK_EPUB_MODE_ONE_PAGE.fetch_req_pattern,
         ];
         await chrome.debugger.sendCommand({ tabId }, "Fetch.enable", {
@@ -111,7 +109,7 @@ chrome.debugger.onEvent.addListener(async (source, method, params) => {
 
         // #cure-warn 根据响应的 URL、当前阅读模式等等，处理响应内容
         try {
-            await handle_response(req_url!, content, "epub");
+            await handle_response(req_url!, content);
         } catch (e) {
             logger.error("handle response error", e);
         }
@@ -196,59 +194,7 @@ function should_decode_res(req_url: string) {
 // #region handle response
 
 /** 根据请求链接来处理特定的内容 */
-async function handle_response(url: string, content: string, mode: ReadMode) {
-    // 因为后期会有大量的关于书籍内容的请求，所以将它放在开头哟，尽可能避免多余的判断
-    if (await handle_book_content(url, content)) {
-        return;
-    }
-
-    if (await handle_book_catalog(url, content)) {
-        return;
-    }
-}
-
-/** 返回 true 表示处理过了 */
-async function handle_book_catalog(url: string, content: string) {
-    let bid: string | undefined = undefined;
-
-    // 从 url 中提取出 bid，从这里也可以判断出当前网站所处的阅读模式？
-    const is_book_pdf_catalog =
-        target_api.BOOK_PDF_MODE_CATALOG.urlpattern.exec(url);
-    // pdf mode
-    if (is_book_pdf_catalog !== null) {
-        bid = is_book_pdf_catalog.search.groups["bid"];
-        if (bid === undefined) {
-            logger.error("get book id from pdf catalog url failed. url: ", url);
-        }
-    }
-    // epub mode
-    else {
-        const is_book_epub_catalog =
-            target_api.BOOK_EPUB_MODE_CATALOG.urlpattern.exec(url);
-        if (is_book_epub_catalog !== null) {
-            bid = is_book_epub_catalog.pathname.groups["bid"];
-            if (bid === undefined) {
-                logger.error(
-                    "get book id from epub catalog url failed. url: ",
-                    url,
-                );
-            }
-        }
-    }
-
-    if (bid === undefined) {
-        return false;
-    }
-
-    if (!(await CureWhbyBookManager.save_book_catalog(bid, content))) {
-        logger.error("save_book_catalog failed, content:", content);
-    }
-
-    return true;
-}
-
-/** 返回 true 表示处理过了 */
-async function handle_book_content(url: string, content: string) {
+async function handle_response(url: string, content: string) {
     let handled = false;
 
     const is_pdf_book_content =
