@@ -18,7 +18,15 @@ type OneBookSimpleData = {
     bid: string;
     name: string;
     author: string;
+    /** 书籍总页数 */
     pages: number;
+    isbn: string;
+    /** 封面图片的 url */
+    coverurl: string;
+    /** 出版日期 */
+    date: string;
+    /** 出版社 */
+    pub: string;
 };
 
 /** 统一表示书籍的书签

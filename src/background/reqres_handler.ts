@@ -24,7 +24,6 @@ export async function start_debugger(tabId: number) {
         // #cure-tip 拦截指定的资源
         // 不同阅读模式下，需要拦截的资源不同，这里直接拦截【所有可能需要的资源好了】
         const patterns: Protocol.Fetch.RequestPattern[] = [
-            target_api.BOOK_SIMPLE_DATA.fetch_req_pattern,
             // pdf
             target_api.BOOK_PDF_MODE_CATALOG.fetch_req_pattern,
             target_api.BOOK_PDF_MODE_SPLIT_IMAGE.fetch_req_pattern,
@@ -54,7 +53,9 @@ chrome.action.onClicked.addListener(async (tab) => {
         return;
     }
     logger.log("debugger start", tab.title, " - ", tab.url);
-    await start_debugger(tab.id);
+    // #cure-test 测试直接请求 API 获取书籍信息
+    // await start_debugger(tab.id);
+    CureWhbyBookManager.save_book_simple_data("3244419");
 });
 
 // #cure-tip 监听 cdp 消息并重写响应
@@ -201,34 +202,9 @@ async function handle_response(url: string, content: string, mode: ReadMode) {
         return;
     }
 
-    if (await handle_book_simple_data(url, content)) {
-        return;
-    }
-
     if (await handle_book_catalog(url, content)) {
         return;
     }
-}
-
-/** 返回 true 表示处理过了 */
-async function handle_book_simple_data(url: string, content: string) {
-    const is_book_simple_data =
-        target_api.BOOK_SIMPLE_DATA.urlpattern.exec(url);
-    if (is_book_simple_data === null) {
-        return false;
-    }
-
-    const bid = is_book_simple_data.search.groups["bid"];
-    if (bid === undefined) {
-        logger.error("get book id from url failed. url: ", url);
-        return false;
-    }
-
-    if (!(await CureWhbyBookManager.save_book_simple_data(content))) {
-        logger.error("save_book_simple_data failed, content:", content);
-    }
-
-    return true;
 }
 
 /** 返回 true 表示处理过了 */

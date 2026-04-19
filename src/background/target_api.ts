@@ -1,27 +1,21 @@
 /** 这里定义了相关的 API 模式，用于拦截请求与响应 */
 
-export const BOOK_HOST = "wqbook.wqxuetang.com";
+/** 书籍首页前缀 */
+export const BOOK_HOST = "https://wqbook.wqxuetang.com";
 
 /** 获取书籍信息的 API，比如作者、书名、总页数等等。
  *
- * 形如 `https://wqbook.wqxuetang.com/api/v7/read/initread?bid=3244419`
+ * 原本是在【书籍阅读页】中拦截响应读取，但是其中包含的信息很少，
+ * 在书记详情页中可以拿到书籍的更多信息，嗯……似乎可以直接请求。
+ * 算了，就直接请求吧，问题不大，毕竟只是普通的数据。
+ *
+ * 形如 `https://wqbook.wqxuetang.com/api/v7/book/initbook?bid=3244419`
  *
  * 其中 `bid` 是书籍的 id
  *
+ * 使用方法：`BOOK_SIMPLE_DATA + bid` 生成对应的链接。
  */
-
-export const BOOK_SIMPLE_DATA: TargetAPI = {
-    fetch_req_pattern: {
-        urlPattern: "*read/initread\?bid=*",
-        resourceType: "XHR",
-        // 只需要获取它的响应，所在在【响应】阶段进行拦截，后面的 API 的配置基本相同咯
-        requestStage: "Response",
-    },
-    urlpattern: new URLPattern({
-        pathname: "*read/initread",
-        search: "bid=:bid",
-    }),
-};
+export const BOOK_SIMPLE_DATA = `${BOOK_HOST}/api/v7/book/initbook?bid=`;
 
 // #region 原貌阅读模式相关的 API
 

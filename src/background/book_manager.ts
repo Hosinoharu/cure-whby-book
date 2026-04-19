@@ -4,6 +4,7 @@ import { BookStorageHelper } from "@/share/storage";
 import CureLogger from "@/share/logger";
 import CryptoJS from "crypto-js";
 import CureBookPageDB from "@/share/book_page_db";
+import { BOOK_HOST, BOOK_SIMPLE_DATA } from "./target_api";
 
 const logger = new CureLogger("bg/book_manager");
 const DEBUG = {
@@ -21,11 +22,14 @@ export abstract class CureWhbyBookManager {
         return book_data;
     }
 
-    /** 保存书籍的基础数据，成功则返回 true */
-    static async save_book_simple_data(
-        str_book_data: string,
-    ): Promise<boolean> {
-        const res = JSON.parse(str_book_data);
+    /** 获取书籍的基础数据并保存，成功则返回 true */
+    static async save_book_simple_data(bid: string): Promise<boolean> {
+        const url = BOOK_SIMPLE_DATA + bid;
+        const response = await fetch(url, {
+            referrer: `${BOOK_HOST}/book/${bid}`,
+        });
+        const res = await response.json();
+
         if (this.check_book_data(res.code, "response code is null") !== 0) {
             return false;
         }
@@ -35,7 +39,6 @@ export abstract class CureWhbyBookManager {
             res.data,
             "response book data is null",
         );
-        const bid = this.check_book_data(String(res.data.bid), "bid is null");
         const old_book_data = await BookStorageHelper.get_book_data(bid);
         const book_data: OneBookData = {
             // 记得保留原始数据
@@ -47,6 +50,13 @@ export abstract class CureWhbyBookManager {
                 "book author is null",
             ),
             pages: this.check_book_data(raw_data.pages, "book pages is null"),
+            coverurl: this.check_book_data(
+                raw_data.coverurl,
+                "book cover is null",
+            ),
+            date: this.check_book_data(raw_data.date, "book date is null"),
+            isbn: this.check_book_data(raw_data.isbn, "book isbn is null"),
+            pub: this.check_book_data(raw_data.pub, "book pub is null"),
         };
         await BookStorageHelper.add_book_data(book_data);
         return true;
