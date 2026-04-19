@@ -83,6 +83,8 @@ export const BOOK_PDF_MODE_SPLIT_IMAGE: TargetAPI = {
     }),
 };
 
+// #region 流式阅读模式
+
 /** 在【流式阅读模式】中，每一页内容的 API
  *
  * 形如 `https://wqbook.wqxuetang.com/deep/epub/read/3244419/6/0/preface3.xhtml?k=...`
@@ -104,3 +106,47 @@ export const BOOK_EPUB_MODE_ONE_PAGE: TargetAPI = {
         pathname: "/deep/epub/read/:bid/:page/:chapter/:filename",
     }),
 };
+
+/** 在【流式阅读模式】中，每一页内容都是 xhtml，它内部可能会包含所需要的 CSS，这是需要下载的。
+ *
+ * 比如某一页 `https://wqbook.wqxuetang.com/deep/epub/read/3244419/1/0/cover.xhtml`，
+ *
+ * 其内部有 `<link src="css/one.css">`，
+ *
+ * 则会请求 `https://wqbook.wqxuetang.com/deep/epub/read/3244419/1/0/css/one.css` 文件！
+ *
+ * 现在就需要捕获其响应，然后保存到数据库中。
+ */
+export const BOOK_EPUB_MODE_PAGE_CSS: TargetAPI = {
+    fetch_req_pattern: {
+        urlPattern: BOOK_EPUB_MODE_ONE_PAGE.fetch_req_pattern.urlPattern,
+        resourceType: "Stylesheet",
+        requestStage: "Response",
+    },
+    urlpattern: new URLPattern({
+        pathname: "/deep/epub/read/:bid/:page/:chapter/css/:filename",
+    }),
+};
+
+/** 在【流式阅读模式】中，每一页内容都是 xhtml，它内部可能会包含所需要的图片，这是需要下载的。
+ *
+ * 比如某一页 `https://wqbook.wqxuetang.com/deep/epub/read/3244419/1/0/cover.xhtml`，
+ *
+ * 其内部有 `<image src="images/cover.jpg">`，
+ *
+ * 则会请求 `https://wqbook.wqxuetang.com/deep/epub/read/3244419/1/0/images/cover.jpg` 文件！
+ *
+ * 现在就需要捕获其响应，然后保存到数据库中。
+ */
+export const BOOK_EPUB_MODE_PAGE_IMAGE: TargetAPI = {
+    fetch_req_pattern: {
+        urlPattern: BOOK_EPUB_MODE_ONE_PAGE.fetch_req_pattern.urlPattern,
+        resourceType: "Image",
+        requestStage: "Response",
+    },
+    urlpattern: new URLPattern({
+        pathname: "/deep/epub/read/:bid/:page/:chapter/images/:filename",
+    }),
+};
+
+// #endregion

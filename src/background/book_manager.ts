@@ -10,6 +10,8 @@ const logger = new CureLogger("bg/book_manager");
 const DEBUG = {
     /** 输出获取到的书籍信息 */
     LOG_BOOK_DATA: true,
+    /** 输出获取到的书籍某页的内容 */
+    LOG_BOOK_PAGE_CONTENT: false,
     /** 在保存一页内容后，输出底层数据库的所有内容，仅用于调试哟 */
     LOG_ALL_BOOK_PAGES: false,
 };
@@ -129,14 +131,30 @@ export abstract class CureWhbyBookManager {
         return result;
     }
 
+    /** 存储 epub 一页的内容 */
     static async save_epub_one_page(
         bid: string,
         page: number,
         chapter: number,
         filename: string,
         content: string,
+        type: ContentKind,
     ): Promise<boolean> {
-        const new_content = EpubModeHelper.decrypt(content);
+        // xhtml 的内容是加密的，其它的不需要处理哟
+        const new_content =
+            type === "xhtml" ? EpubModeHelper.decrypt(content) : content;
+
+        DEBUG.LOG_BOOK_PAGE_CONTENT &&
+            logger.log(
+                "epub page content",
+                "bid:",
+                bid,
+                ", page:",
+                page,
+                ", content:",
+                content,
+            );
+
         const ok = await CureBookPageDB.Instance.save_one_page(
             bid,
             "epub",
@@ -144,6 +162,7 @@ export abstract class CureWhbyBookManager {
             new_content,
             chapter,
             filename,
+            type,
         );
         // #cure-question 不知道为什么，调试工具不显示插件创建的 indexedDB？？？
         DEBUG.LOG_ALL_BOOK_PAGES &&

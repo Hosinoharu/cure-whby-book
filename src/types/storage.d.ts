@@ -20,12 +20,17 @@ type BookPageStoreItem = {
      * - 对于 epub 文件，是`章节的 id + 页码`，例如 `1-1`
      */
     pid: string;
-    /** 避免重复写入，它作为每一页的唯一 id */
-    unique_id: string;
+    /** 避免重复写入，它作为每一页的唯一 id，其构成为
+     *
+     * `${bid}-${chapter}-${page}-${type}`
+     */
+    unique_id: `${string}-${number}-${number}-${ContentKind}`;
     /** 表示存储的是该阅读模式下的页面 */
     mode: ReadMode;
     /** 该页的名称，只有 epub 才有 */
     filename?: string;
     /** 该页的内容 */
     content: string;
+    /** 存储的内容格式，它也可以存储静态文件哟 */
+    type: ContentKind;
 };

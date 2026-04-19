@@ -9,10 +9,10 @@ const logger = new CureLogger("bg/reqres_handler");
 const DEBUG = {
     /** 输出所有捕获到的 cdp 消息 */
     LOG_ALL_CDP_MSG: false,
-    /** 输出插件拦截捕获的响应内容 */
+    /** 输出插件拦截捕获的、原始的响应内容 */
     LOG_CATCH_RESPONSE: false,
     /** 输出保存书籍内容时的日志，比如是第几页等，不会输出要保存的页内容哟 */
-    LOG_SAVE_BOOK_CONTENT: false,
+    LOG_SAVE_BOOK_CONTENT: true,
 };
 
 /** 监听特定标签页的请求与响应 */
@@ -28,6 +28,8 @@ export async function start_debugger(tabId: number) {
             target_api.BOOK_PDF_MODE_SPLIT_IMAGE.fetch_req_pattern,
             // epub
             target_api.BOOK_EPUB_MODE_ONE_PAGE.fetch_req_pattern,
+            target_api.BOOK_EPUB_MODE_PAGE_CSS.fetch_req_pattern,
+            target_api.BOOK_EPUB_MODE_PAGE_IMAGE.fetch_req_pattern,
         ];
         await chrome.debugger.sendCommand({ tabId }, "Fetch.enable", {
             patterns,
@@ -193,8 +195,11 @@ function should_decode_res(req_url: string) {
     let result = true;
 
     // 在拿到书籍的内容时，不需要再进行一次 base64 decode，直接拿去进行解密处理就好
-    // 其它的情况中，大都是需要转换的，比如获取书籍的信息
-    if (target_api.BOOK_EPUB_MODE_ONE_PAGE.urlpattern.test(req_url)) {
+    // 拿到 epub 中需要的图片时，也不需要解码
+    if (
+        target_api.BOOK_EPUB_MODE_ONE_PAGE.urlpattern.test(req_url) ||
+        target_api.BOOK_EPUB_MODE_PAGE_IMAGE.urlpattern.test(req_url)
+    ) {
         result = false;
     }
 
@@ -207,12 +212,32 @@ function should_decode_res(req_url: string) {
 
 /** 根据请求链接来处理特定的内容 */
 async function handle_response(url: string, content: string) {
+    // 因为后期会有大量的关于书籍内容的请求，所以将它放在开头哟，尽可能避免多余的判断
+    if (await handle_book_content(url, content)) {
+        return;
+    }
+
+    // 处理 epub 书籍中的请求的 css、图片等静态文件
+    if (await handle_epub_book_assets(url, content)) {
+        return;
+    }
+}
+
+/** 处理 pdf book 中的小图片、以及 epub book 的一页内容
+ *
+ * 返回 true 表示处理过了
+ */
+async function handle_book_content(
+    url: string,
+    content: string,
+): Promise<boolean> {
     let handled = false;
 
     const is_pdf_book_content =
         target_api.BOOK_PDF_MODE_SPLIT_IMAGE.urlpattern.exec(url);
     // pdf mode
     if (is_pdf_book_content !== null) {
+        handled = true;
         const bid = is_pdf_book_content.pathname.groups["bid"];
         const page = is_pdf_book_content.pathname.groups["page"];
 
@@ -224,14 +249,13 @@ async function handle_response(url: string, content: string) {
                 url,
             );
         }
-
-        handled = true;
     }
     // epub mode
     else {
         const is_epub_book_content =
             target_api.BOOK_EPUB_MODE_ONE_PAGE.urlpattern.exec(url);
         if (is_epub_book_content !== null) {
+            handled = true;
             const bid = is_epub_book_content.pathname.groups["bid"];
             const page = is_epub_book_content.pathname.groups["page"];
             const chapter = is_epub_book_content.pathname.groups["chapter"];
@@ -256,8 +280,6 @@ async function handle_response(url: string, content: string) {
                     url,
                 );
             }
-
-            handled = true;
         }
     }
 
@@ -284,15 +306,17 @@ async function handle_epub_book_content(
             ", filename:",
             filename,
         );
-    if (
-        !(await CureWhbyBookManager.save_epub_one_page(
-            bid,
-            page,
-            chapter,
-            filename,
-            content,
-        ))
-    ) {
+
+    const ok = await CureWhbyBookManager.save_epub_one_page(
+        bid,
+        page,
+        chapter,
+        filename,
+        content,
+        "xhtml",
+    );
+
+    !ok &&
         logger.error(
             "save_epub_one_page failed",
             "bid:",
@@ -304,7 +328,6 @@ async function handle_epub_book_content(
             ", filename:",
             filename,
         );
-    }
 }
 
 async function handle_pdf_book_content(
@@ -314,6 +337,90 @@ async function handle_pdf_book_content(
 ) {
     DEBUG.LOG_SAVE_BOOK_CONTENT &&
         logger.log("get pdf book content.", "bid:", bid, ", page:", page);
+}
+
+/** 处理 epub book 中的请求的 css、图片等静态文件 */
+async function handle_epub_book_assets(
+    url: string,
+    content: string,
+): Promise<boolean> {
+    let handled = false;
+    let type: ContentKind | undefined;
+
+    let final_pattern_result: URLPatternResult | null = null;
+    const is_css = target_api.BOOK_EPUB_MODE_PAGE_CSS.urlpattern.exec(url);
+    // css
+    if (is_css !== null) {
+        handled = true;
+        final_pattern_result = is_css;
+        type = "css";
+    }
+    // image
+    else {
+        handled = true;
+        const is_img =
+            target_api.BOOK_EPUB_MODE_PAGE_IMAGE.urlpattern.exec(url);
+        if (is_img !== null) {
+            final_pattern_result = is_img;
+            type = "img";
+        }
+    }
+
+    // 可以统一操作，提取相同的信息
+    if (final_pattern_result !== null) {
+        const bid = final_pattern_result.pathname.groups["bid"];
+        const page = final_pattern_result.pathname.groups["page"];
+        const chapter = final_pattern_result.pathname.groups["chapter"];
+        const filename = final_pattern_result.pathname.groups["filename"];
+
+        // 额...下面这个缩进、格式，有点费眼睛呀
+        if (
+            bid !== undefined &&
+            page !== undefined &&
+            chapter !== undefined &&
+            filename !== undefined &&
+            type !== undefined
+        ) {
+            DEBUG.LOG_SAVE_BOOK_CONTENT &&
+                logger.log(
+                    "get epub book assets",
+                    "bid:",
+                    bid,
+                    ", page:",
+                    page,
+                    ", chapter:",
+                    chapter,
+                    ", filename:",
+                    filename,
+                );
+
+            const ok = await CureWhbyBookManager.save_epub_one_page(
+                bid,
+                parseInt(page),
+                parseInt(chapter),
+                filename,
+                content,
+                type,
+            );
+
+            !ok &&
+                logger.error(
+                    "save_epub_one_page assets failed",
+                    "bid:",
+                    bid,
+                    ", page:",
+                    page,
+                    ", chapter:",
+                    chapter,
+                    ", filename:",
+                    filename,
+                );
+        } else {
+            logger.error("get epub book assets file failed. url: ", url);
+        }
+    }
+
+    return handled;
 }
 
 // #endregion

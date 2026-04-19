@@ -14,6 +14,12 @@ const DEBUG = {
  * 每添加的一条内容就是书籍的某一页内容哟。
  *
  * 将来可以提取所有特定书籍 id 的【页内容】咯
+ *
+ * # 注意
+ * 该数据库中会保存书籍某一页的内容，比如在 epub 阅读模式中，书籍一页的内容是 xhtml 格式。
+ * 但是 xhtml 内容还涉及到一些 css、imgage 等文件，也会被保存到该数据库中。
+ *
+ * 这样，将来根据书籍 id 就可以拿到其所有的数据，然后将 xhtml、css、image 等分类写入到 epub 格式的文件中！
  */
 export default class CureBookPageDB {
     private static instance?: CureBookPageDB;
@@ -90,6 +96,7 @@ export default class CureBookPageDB {
      * @param content 该页的内容
      * @param chapter 章节数，仅 epub 需要此参数
      * @param filename 该页的名字，仅 epub 需要此参数
+     * @param type 实际存储的内容类型，仅 epub 需要此参数
      *
      *
      * @returns 保存成功则返回 true
@@ -101,6 +108,7 @@ export default class CureBookPageDB {
         content: string,
         chapter?: number,
         filename?: string,
+        type?: ContentKind,
     ): Promise<boolean> {
         if (this.db === null) {
             logger.error("db is null");
@@ -110,7 +118,11 @@ export default class CureBookPageDB {
         if (mode === "pdf") {
             return await this.save_pdf_one_page(bid, page);
         } else if (mode === "epub") {
-            if (chapter === undefined || filename === undefined) {
+            if (
+                chapter === undefined ||
+                filename === undefined ||
+                type === undefined
+            ) {
                 logger.error("epub mode need chapter number and filename");
                 return false;
             }
@@ -118,10 +130,11 @@ export default class CureBookPageDB {
             const data: BookPageStoreItem = {
                 bid,
                 pid: `${chapter}-${page}`,
-                unique_id: `${bid}-${chapter}-${page}`,
+                unique_id: `${bid}-${chapter}-${page}-${type}`,
                 mode,
                 filename,
                 content,
+                type: "xhtml",
             };
             return await this.save_epub_one_page(data);
         }

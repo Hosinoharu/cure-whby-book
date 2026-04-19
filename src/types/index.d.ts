@@ -31,6 +31,8 @@ type OneBookSimpleData = {
     catalog?: BookCatalogNode[];
 };
 
+type ContentKind = "xhtml" | "css" | "img";
+
 /** 统一表示书籍的书签 */
 type BookCatalogNode = {
     /** 书签节点 ID */
