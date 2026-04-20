@@ -11,6 +11,7 @@
         "128": "icons/icon-128.png"
     },
     "action": {
+        "default_popup": "popup/index.html",
         "default_icon": "icons/icon-64.png"
     },
     "background": {
@@ -22,7 +23,8 @@
         "tabs",
         "debugger",
         "storage",
-        "unlimitedStorage"
+        "unlimitedStorage",
+        "downloads"
     ],
     "host_permissions": [
         "<all_urls>"

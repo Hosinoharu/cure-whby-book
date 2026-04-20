@@ -47,26 +47,16 @@ export async function stop_debugger(tabId: number) {
     } catch {}
 }
 
-// #cure-test 点击图标启动调试来进行测试
-chrome.action.onClicked.addListener(async (tab) => {
-    if (tab.id === undefined) {
-        return;
-    }
-    logger.log("debugger start", tab.title, " - ", tab.url);
-    await start_debugger(tab.id);
+// #cure-tip 监听 popup 消息，开启标签页的 debugger
+chrome.runtime.onMessage.addListener(async (request, sender, sendResponse) => {
+    logger.log("popup message", request);
+    sendResponse();
 
-    // #cure-test/warn 在阅读页面开启插件功能
-    // https://wqbook.wqxuetang.com/deep/read/epub?bid=3244419
-    // https://wqbook.wqxuetang.com/deep/read/pdf?bid=3244419
-    // 从 url 中提取对应的 bid，然后获取书籍的基础信息咯
-    const url = new URL(tab.url || "");
-    const bid = url.searchParams.get("bid");
-    if (bid) {
-        if (!CureWhbyBookManager.save_book_simple_data(bid)) {
-            logger.error("save book simple data error", bid);
-        }
+    const { tabId, bid } = request;
+    if (await CureWhbyBookManager.save_book_simple_data(bid)) {
+        await start_debugger(tabId);
     } else {
-        logger.error("can not get bid from url", tab.url);
+        logger.error("save book simple data error");
     }
 });
 

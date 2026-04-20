@@ -2,7 +2,7 @@
 
 import CureLogger from "./logger";
 
-const logger = new CureLogger("book_page_db");
+const logger = new CureLogger("share/book_page_db");
 const DEBUG = {
     /** 输出添加的页面内容 */
     LOG_ADD_PAGE_DATA: false,
@@ -111,8 +111,12 @@ export default class CureBookPageDB {
         type?: ContentKind,
     ): Promise<boolean> {
         if (this.db === null) {
-            logger.error("db is null");
-            return false;
+            try {
+                await this.init();
+            } catch (e) {
+                logger.error("init db failed", e);
+                return false;
+            }
         }
 
         if (mode === "pdf") {
@@ -127,14 +131,19 @@ export default class CureBookPageDB {
                 return false;
             }
 
+            const unique_id =
+                type === "xhtml"
+                    ? `${bid}-${chapter}-${page}`
+                    : `${bid}-${filename}`;
+
             const data: BookPageStoreItem = {
                 bid,
                 pid: `${chapter}-${page}`,
-                unique_id: `${bid}-${chapter}-${page}-${type}`,
+                unique_id,
                 mode,
                 filename,
                 content,
-                type: "xhtml",
+                type,
             };
             return await this.save_epub_one_page(data);
         }
@@ -202,8 +211,12 @@ export default class CureBookPageDB {
         chapter?: number,
     ): Promise<string | undefined> {
         if (this.db === null) {
-            logger.error("db is null");
-            return undefined;
+            try {
+                await this.init();
+            } catch (e) {
+                logger.error("init db failed", e);
+                return;
+            }
         }
 
         if (mode === "pdf") {
@@ -228,6 +241,39 @@ export default class CureBookPageDB {
         chapter: number,
     ): Promise<string | undefined> {
         throw new Error("Method not implemented.");
+    }
+
+    /** 获取书籍的所有页内容 */
+    async get_all_pages(bid: string): Promise<BookPageStoreItem[]> {
+        if (this.db === null) {
+            try {
+                await this.init();
+            } catch (e) {
+                logger.error("init db failed", e);
+                return [];
+            }
+        }
+
+        // 基于索引 bid 查找所有内容
+        const req = this.db
+            ?.transaction(this.store_name, "readonly")
+            .objectStore(this.store_name)
+            ?.index("bid")
+            ?.getAll(bid);
+
+        if (req === undefined) {
+            return [];
+        }
+
+        return new Promise((resolve, reject) => {
+            req.onsuccess = () => {
+                resolve(req.result as BookPageStoreItem[]);
+            };
+            req.onerror = (e) => {
+                logger.error("get_all_pages failed", e);
+                reject(e);
+            };
+        });
     }
 
     // #endregion
@@ -265,9 +311,3 @@ export default class CureBookPageDB {
 
     // #endregion
 }
-
-// 安装时创建数据库
-chrome.runtime.onInstalled.addListener(() => {
-    CureBookPageDB.Instance.remove();
-    CureBookPageDB.Instance;
-});

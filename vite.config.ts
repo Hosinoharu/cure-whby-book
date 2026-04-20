@@ -2,12 +2,12 @@ import fs from "fs";
 import path from "path";
 import { defineConfig } from "vite";
 
-const extension_out_dir = path.resolve(__dirname, "dist");
-const outDir = path.resolve(extension_out_dir, "background");
+const outDir = path.resolve(__dirname, "dist");
 
 export default defineConfig({
+    root: "./src",
     plugins: [
-        vite_plugin_copy_files(extension_out_dir, [
+        vite_plugin_copy_files(outDir, [
             {
                 from: path.resolve(__dirname, "manifest.json"),
                 to: ".",
@@ -25,9 +25,20 @@ export default defineConfig({
                     __dirname,
                     "src/background/index.ts",
                 ),
+                popup: path.resolve(__dirname, "src/popup/index.html"),
             },
             output: {
-                entryFileNames: "[name].js",
+                entryFileNames: (chunk_info) => {
+                    let prefix = "";
+                    if (chunk_info.name === "service_worker") {
+                        prefix = "background/";
+                    } else if (chunk_info.name === "popup") {
+                        prefix = "popup/";
+                    }
+                    return prefix + "[name].js";
+                },
+                chunkFileNames: "[name].js",
+                assetFileNames: "[name].[ext]",
             },
         },
         outDir,

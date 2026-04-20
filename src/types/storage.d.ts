@@ -22,14 +22,17 @@ type BookPageStoreItem = {
     pid: string;
     /** 避免重复写入，它作为每一页的唯一 id，其构成为
      *
-     * `${bid}-${chapter}-${page}-${type}`
+     * 当保存为 xhtml 时，其构成为 `${bid}-${chapter}-${page}`，这才是唯一的！
+     * 当保存为 css、img 时，它本身就是唯一的，所以其构成为 `${bid}-${filename}`
      */
-    unique_id: `${string}-${number}-${number}-${ContentKind}`;
+    unique_id: string;
     /** 表示存储的是该阅读模式下的页面 */
     mode: ReadMode;
     /** 该页的名称，只有 epub 才有 */
     filename?: string;
-    /** 该页的内容 */
+    /** 该页的内容
+     * - `type` 为 `img`` 时，它是一个图片的 base64 encode 内容
+     */
     content: string;
     /** 存储的内容格式，它也可以存储静态文件哟 */
     type: ContentKind;

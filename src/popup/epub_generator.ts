@@ -1,0 +1,259 @@
+/** 生成 epub 文件，标准遵循 Epub3：https://www.w3.org/TR/epub-33/
+ *
+ * 验证 epub 文件：https://github.com/w3c/epubcheck
+ * - 如果是从网页下载的 xhtml 内容有误，则不会处理哟
+ * - 仅处理我生成的 epub 内部文件的错误，比如 `content.opf` 文件等等
+ */
+
+import JSZip from "jszip";
+import CureLogger from "@/share/logger";
+
+const logger = new CureLogger("popup/epub_generator");
+const DEBUG = {
+    /* 输出生成 content.opf 文件的内容 */
+    LOG_OPF: true,
+    /* 输出生成 toc.ncx 文件的内容 */
+    LOG_NCX: true,
+};
+
+/**
+ * 这是一个非常简单的 epub 生成，最后打包成一个 zip 文件。
+ *
+ * https://www.w3.org/TR/epub-33/#sec-container-zip
+ *
+ * 因为从网页中已经能获取到每一页的 .xhtml 内容,
+ * 此处仅组织它们并生成 epub 文件啦
+ *
+ * # 打包的目录结构
+ * https://www.w3.org/TR/epub-33/#sec-container-file-and-dir-structure
+ * ```plaintext
+ * mimetype
+ * META-INF
+ *      container.xml
+ * OEBPS
+ *      toc.ncx
+ *      content.opf
+ *      css/     # 存储所有 css 文件
+ *      images/  # 存储所有图片文件
+ *      ...      # 存储所有 xhtml 文件
+ * ```
+ */
+export default class CureEpubGenerator {
+    private zip: JSZip;
+
+    constructor(
+        /** 书籍的基本信息 */
+        private book_data: OneBookData,
+        /** 书籍的每一页内容 */
+        private book_pages: BookPageStoreItem[],
+    ) {
+        this.zip = new JSZip();
+    }
+
+    /** 写入 `mimetype` 文件 */
+    private write_file_mimetype() {
+        // https://www.w3.org/TR/epub-33/#sec-zip-container-mime
+        const content = "application/epub+zip";
+        this.zip.file("mimetype", content);
+    }
+
+    // #region META-INF directory
+    // https://www.w3.org/TR/epub-33/#sec-container-abstract
+    // https://www.w3.org/TR/epub-33/#sec-container-metainf
+
+    /** 写入 `META-INF/container.xml` 文件 */
+    private write_file_container() {
+        //  https://www.w3.org/TR/epub-33/#sec-container-metainf-container.xml
+        const content = `
+<?xml version="1.0" encoding="UTF-8"?>
+<container version="1.0" xmlns="urn:oasis:names:tc:opendocument:xmlns:container">
+    <rootfiles>
+        <rootfile full-path="OEBPS/content.opf" media-type="application/oebps-package+xml"/>
+    </rootfiles>
+</container>`;
+        this.zip.file("META-INF/container.xml", content.trim(), {
+            createFolders: true,
+        });
+    }
+
+    // #endregion
+
+    // #region OEBPS directory
+
+    /** 生成 `OEBPS/content.opf 文件的内容`
+     *
+     * https://www.w3.org/TR/epub-33/#sec-package-doc
+     *
+     */
+    private gen_file_opf_content(
+        tag_metadata: string,
+        tag_manifest: string,
+        tag_spine: string,
+    ) {
+        return `
+<?xml version="1.0" encoding="utf-8"?>
+<package version="3.0" xmlns="http://www.idpf.org/2007/opf" unique-identifier="ISBN">
+${tag_metadata}
+${tag_manifest}
+${tag_spine}
+</package>`;
+    }
+
+    /** 生成 `OEBPS/content.opf` 文件的 `metadata` 标签  */
+    private gen_opf_tag_metadata() {
+        return `
+<metadata xmlns:dc="http://purl.org/dc/elements/1.1/">
+    <dc:identifier id="ISBN">${this.book_data.isbn}</dc:identifier>
+    <dc:title>${this.book_data.name}</dc:title>
+    <dc:language>zh-CN</dc:language>
+    <dc:creator>${this.book_data.author}</dc:creator>
+    <dc:publisher>${this.book_data.pub}</dc:publisher>
+    <dc:date>${this.book_data.date}</dc:date>
+    <meta property="dcterms:modified">${this.gen_current_date()}</meta>
+</metadata>`;
+    }
+
+    /** 写入 `OEBPS/content.opf` 文件 */
+    private write_file_opf() {
+        /** 插入到 manifest 中的、所有关于 xhtml 的 item */
+        const xhtml_item: string[] = [];
+        let xhtml_index = 0;
+        /** 插入到 manifest 中的、所有关于 css 的 item */
+        const css_item: string[] = [];
+        let css_index = 0;
+        /** 插入到 manifest 中的、所有关于图片的 item */
+        const img_item: string[] = [];
+        let img_index = 0;
+        /** 插入到 spine 中的、所有关于 xhtml 的 item */
+        const spine_item: string[] = [];
+
+        // 先排序 xhtml，这样后面写入 spine 标签等操作时可以直接写入
+        this.book_pages.sort((a, b) => {
+            const [a1, a2] = a.pid.split("-");
+            const [b1, b2] = b.pid.split("-");
+            return parseInt(a1) - parseInt(b1) || parseInt(a2) - parseInt(b2);
+        });
+        // 放在这里就只需要遍历一次，完成了两件事：写入和创建 item
+        this.book_pages.forEach((item) => {
+            if (!item.filename) {
+                throw new Error("book page item's filename is empty");
+            }
+
+            switch (item.type) {
+                case "xhtml":
+                    this.write_one_xhtml_file(item.filename, item.content);
+                    // #cure-warn 判断目录文件，并记录 id
+                    // 根据文件名来判断似乎不可靠，但我也没有什么好办法啦
+                    const is_nav = item.filename === "content.xhtml";
+                    // Exactly one manifest item must declare the "nav" property
+                    const properties = is_nav ? 'properties="nav"' : "";
+
+                    xhtml_item.push(
+                        `<item id="xhtml-${xhtml_index}" ${properties} media-type="application/xhtml+xml" href="${item.filename}" />`,
+                    );
+                    spine_item.push(`<itemref idref="xhtml-${xhtml_index}" />`);
+                    xhtml_index++;
+                    break;
+                case "css":
+                    this.write_one_css_file(item.filename, item.content);
+                    css_item.push(
+                        `<item id="css-${css_index}" media-type="text/css" href="css/${item.filename}" />`,
+                    );
+                    css_index++;
+                    break;
+                case "img":
+                    this.write_one_img_file(item.filename, item.content);
+                    img_item.push(
+                        `<item id="img-${img_index}" media-type="image/jpeg" href="images/${item.filename}" />`,
+                    );
+                    img_index++;
+                    break;
+                default:
+                    throw new Error(
+                        `unknown book page item type: ${item.type}`,
+                    );
+            }
+        });
+
+        const tag_metadata = this.gen_opf_tag_metadata();
+
+        // https://www.w3.org/TR/epub-33/#sec-pkg-manifest
+        const tag_manifest = `
+<manifest>
+${xhtml_item.join("\n")}
+
+${css_item.join("\n")}
+
+${img_item.join("\n")}
+</manifest>`;
+
+        const tag_spine = `
+<spine>
+${spine_item.join("\n")}
+</spine>`;
+
+        const content = this.gen_file_opf_content(
+            tag_metadata,
+            tag_manifest,
+            tag_spine,
+        );
+
+        DEBUG.LOG_OPF && logger.log("epub opf content", content);
+        this.zip.file("OEBPS/content.opf", content.trim(), {
+            createFolders: true,
+        });
+    }
+
+    /** 生成当前时间，格式 `CCYY-MM-DDThh:mm:ssZ` */
+    private gen_current_date() {
+        return new Date().toISOString().split(".")[0] + "Z";
+    }
+
+    /** 写入一个 xhtml 到 `OEBPS` 目录中 */
+    private write_one_xhtml_file(filename: string, content: string) {
+        this.zip.file(`OEBPS/${filename}`, content, {
+            createFolders: true,
+        });
+    }
+
+    /** 写入一个 css 到 `OEBPS/css` 目录中 */
+    private write_one_css_file(filename: string, content: string) {
+        this.zip.file(`OEBPS/css/${filename}`, content, {
+            createFolders: true,
+        });
+    }
+
+    /** 写入一个图片到 `OEBPS/images` 目录中 */
+    private write_one_img_file(filename: string, content: string) {
+        this.zip.file(`OEBPS/images/${filename}`, content, {
+            createFolders: true,
+            base64: true,
+        });
+    }
+
+    // #endregion
+
+    /** 生成一个打包后的 zip，再让插件触发下载 */
+    async pack_and_download() {
+        this.write_file_mimetype();
+        this.write_file_container();
+        this.write_file_opf();
+
+        const blob = await this.zip.generateAsync({
+            type: "blob",
+            mimeType: "application/epub+zip",
+        });
+        const url = URL.createObjectURL(blob);
+        try {
+            const downloadId = await chrome.downloads.download({
+                url,
+                filename: `${this.book_data.name}(${this.book_data.author}).epub`,
+                saveAs: true,
+            });
+        } catch (e) {
+            logger.error("download epub error", e);
+        } finally {
+            URL.revokeObjectURL(url);
+        }
+    }
+}
