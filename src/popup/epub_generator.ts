@@ -10,8 +10,10 @@ import CureLogger from "@/share/logger";
 
 const logger = new CureLogger("popup/epub_generator");
 const DEBUG = {
-    /* 输出生成 content.opf 文件的内容 */
+    /** 输出生成 content.opf 文件的内容 */
     LOG_OPF: false,
+    /** 输出生成 nav.xhtml 文件的内容 */
+    LOG_NAV: false,
 };
 
 /**
@@ -78,6 +80,8 @@ export default class CureEpubGenerator {
 
     // #region OEBPS directory
 
+    // #region file content.opf
+
     /** 生成 `OEBPS/content.opf 文件的内容`
      *
      * https://www.w3.org/TR/epub-33/#sec-package-doc
@@ -99,13 +103,15 @@ ${tag_spine}
 
     /** 生成 `OEBPS/content.opf` 文件的 `metadata` 标签  */
     private gen_opf_tag_metadata(cover_img_id?: string) {
+        // https://idpf.org/epub/20/spec/OPF_2.0.1_draft.htm#Section2.2
         const cover_meta = cover_img_id
             ? `<meta content="${cover_img_id}" name="cover"/>`
             : "";
 
+        // https://www.w3.org/TR/epub-33/#example-indicating-an-identifier-is-an-isbn
         return `
 <metadata xmlns:dc="http://purl.org/dc/elements/1.1/">
-    <dc:identifier id="ISBN">${this.book_data.isbn}</dc:identifier>
+    <dc:identifier id="ISBN">urn:isbn:${this.book_data.isbn}</dc:identifier>
     <dc:title>${this.book_data.name}</dc:title>
     <dc:language>zh-CN</dc:language>
     <dc:creator>${this.book_data.author}</dc:creator>
@@ -149,15 +155,27 @@ ${tag_spine}
 
             switch (item.type) {
                 case "xhtml":
-                    this.write_one_xhtml_file(item.filename, item.content);
-                    // #cure-warn 判断目录文件，并标记它
+                    // #cure-warn 判断目录文件，并生成 nav 文件
                     // 根据文件名来判断似乎不可靠，但我也没有什么好办法啦
-                    const is_nav = item.filename === "content.xhtml";
-                    // Exactly one manifest item must declare the "nav" property
-                    const properties = is_nav ? 'properties="nav"' : "";
+                    if (item.filename === "content.xhtml") {
+                        // 避免可能的命名冲突
+                        const filename = "cure-nav.xhtml";
+                        if (this.write_nav_file(filename, item.content)) {
+                            // Exactly one manifest item must declare the "nav" property
+                            xhtml_item.push(
+                                `<item id="nav" properties="nav" media-type="application/xhtml+xml" href="${filename}" />`,
+                            );
+                            // 似乎就不需要这个多余的 content.xhtml 了？？目录都已经有了嘛
+                            // 不对，根据所述
+                            // As a conforming XHTML content document, EPUB creators MAY include the EPUB navigation document in the spine.
+                            // 所以保留 content.xhtml 吧
+                            // return;
+                        }
+                    }
 
+                    this.write_one_xhtml_file(item.filename, item.content);
                     xhtml_item.push(
-                        `<item id="xhtml-${xhtml_index}" ${properties} media-type="application/xhtml+xml" href="${item.filename}" />`,
+                        `<item id="xhtml-${xhtml_index}" media-type="application/xhtml+xml" href="${item.filename}" />`,
                     );
                     spine_item.push(`<itemref idref="xhtml-${xhtml_index}" />`);
                     xhtml_index++;
@@ -225,6 +243,34 @@ ${spine_item.join("\n")}
         });
     }
 
+    // #endregion
+
+    /** 写入 `OEBPS/nav.xhtml` 和 `OEBPS/toc.ncx` 文件，返回 true 表示操作成功！
+     *
+     * 网站下载的书籍有一个 content.xhtml 文件，它包含了目录信息。
+     *
+     * 注意，该目录信息是专门用于 epub 文件的，而不是纸质书籍那种目录。
+     *
+     * 但是该 content.xhtml 并不符合 epub3 规范，所以需要重新生成一个目录文件，
+     *
+     * 此时有两种方案：
+     * - 生成 epub2 规范的目录 toc.ncx
+     * - 生成 epub3 规范的目录 nav.xhtml
+     *
+     * 我使用的 epub 阅读器不能解析 epub3 规范，
+     * 也许应该同时生成 epub2 规范的目录 toc.ncx、epub3 规范的目录 nav.xhtml
+     */
+    private write_nav_file(filename: string, content: string): boolean {
+        const new_content = new NavGenerator(
+            this.book_data.name,
+            content,
+        ).generate_nav_xhtml();
+        if (content) {
+            this.write_one_xhtml_file(filename, new_content);
+        }
+        return true;
+    }
+
     /** 生成当前时间，格式 `CCYY-MM-DDThh:mm:ssZ` */
     private gen_current_date() {
         return new Date().toISOString().split(".")[0] + "Z";
@@ -277,3 +323,124 @@ ${spine_item.join("\n")}
         }
     }
 }
+
+/** 根据 `content.xhtml` 内容生成 `nav.xhtml` 的内容
+ *
+ * https://www.w3.org/TR/epub-33/#sec-nav
+ */
+class NavGenerator {
+    constructor(
+        private book_name: string,
+        private content: string,
+    ) {}
+
+    /** 解析 `content.xhtml` 提取出结构化的数据 */
+    private get_formatted_data() {
+        const parser = new DOMParser();
+        const doc = parser.parseFromString(
+            this.content.trim(),
+            "application/xhtml+xml",
+        );
+
+        const parse_error = doc.querySelector("parsererror");
+        if (parse_error) {
+            logger.error(
+                "content xhtml parse error",
+                "book:",
+                this.book_name,
+                ", error:",
+                parse_error.textContent,
+            );
+            return;
+        }
+
+        const result: OneParsedNavItem[] = [];
+        doc.querySelectorAll("p").forEach((item) => {
+            const link = item.querySelector("a");
+            if (link) {
+                const href = link.getAttribute("href");
+                const level = parseInt(
+                    item.getAttribute("class")?.at(-1) || "1",
+                );
+                const title = link.textContent.trim();
+                if (href && title) {
+                    result.push({ href, title, level });
+                }
+            }
+        });
+
+        // 应该不需要排序，默认就是有序的...应该是
+        return result;
+    }
+
+    // #region epub 3 规范
+
+    /** 生成书签的各个 tag */
+    private gen_epub3_content_tag(data: OneParsedNavItem[]) {
+        // #cure-test 先不管层级关系，直接生成简单的目录
+        const li_content = data
+            .map((item) => {
+                return `<li><a href="${item.href}">${item.title}</a></li>`;
+            })
+            .join("\n");
+        return `<ol>\n${li_content}\n</ol>`;
+    }
+
+    /** https://www.w3.org/TR/epub-33/#sec-nav-def-model */
+    private gen_epub3_tag_nav() {
+        const data = this.get_formatted_data();
+        if (!data) {
+            return "";
+        }
+
+        const content_tag = this.gen_epub3_content_tag(data);
+        return `<nav epub:type="toc">\n${content_tag}\n</nav>`;
+    }
+
+    /** 生成 epub 3 规范的 nav.xhtml 内容 */
+    generate_nav_xhtml() {
+        const tag_nav = this.gen_epub3_tag_nav();
+        return `
+<?xml version="1.0" encoding="utf-8"?>
+<html xml:lang="zh-cn" xmlns="http://www.w3.org/1999/xhtml" xmlns:epub="http://www.idpf.org/2007/ops">
+<head>
+	<title>${this.book_name}</title>
+</head>
+<body>
+    ${tag_nav}
+</body>
+</html>
+`.trim();
+    }
+
+    // #endregion
+
+    // #region epub 2 规范
+
+    /** 生成 epub 2 规范的 toc_ncx 内容 */
+    generate_toc_ncx() {
+        //
+    }
+
+    // #endregion
+}
+
+// #region type
+
+type OneParsedNavItem = {
+    /** 书签的标题 */
+    title: string;
+    /** 书签的跳转连接，有两种形式
+     * - 文件名：`preface4.xhtml`
+     * - 带有锚点的文件名：`chapter1.xhtml#isbn9787302596585_1_1_1_2`
+     * 其中后面 `1_1_1_2` 表示了层级关系哟
+     */
+    href: string;
+    /** 书签的层级，数字 1 表示顶层，数字 2 表示次层级咯
+     *
+     * 根据 `<p class="contents-1"><a href="part1.xhtml">xxxx</a></p>` 中的 `class` 属性来确定哟
+     */
+    level: number;
+};
+
+// #endregion
