@@ -13,7 +13,7 @@ const DEBUG = {
     /** 输出获取到的书籍某页的内容 */
     LOG_BOOK_PAGE_CONTENT: false,
     /** 在保存一页内容后，输出底层数据库的所有内容，仅用于调试哟 */
-    LOG_ALL_BOOK_PAGES: true,
+    LOG_ALL_BOOK_PAGES: false,
 };
 
 /** 管理一本书籍的相关信息，包括下载等等 */
@@ -165,7 +165,7 @@ export abstract class CureWhbyBookManager {
             type,
         );
         DEBUG.LOG_ALL_BOOK_PAGES &&
-            (await CureBookPageDB.Instance.show_all_data());
+            (await CureBookPageDB.Instance.show_all_data(bid));
         return ok;
     }
 

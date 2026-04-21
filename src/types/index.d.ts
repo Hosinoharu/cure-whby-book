@@ -55,3 +55,27 @@ interface ICureWhbyDownloader {
     /** 保存书籍某一页的内容，如果是二进制内容，则需要 base64 encode 再保存 */
     save_one_page(page: number, content: string): unknown;
 }
+
+// #region background 和 popup 通信的数据格式
+
+/** background 和 popup 通信的数据格式 */
+type MsgInBgAndPopup = MsgStartDebugger | MsgStartPack;
+
+/** background 和 popup 通信的数据格式 —— 启动调试模式 */
+type MsgStartDebugger = {
+    type: "start-debugger";
+    data: {
+        tabId: number;
+        bid: string;
+    };
+};
+
+/** background 和 popup 通信的数据格式 —— 通知 bg 即将打包 epub 并下载 */
+type MsgStartPack = {
+    type: "start-pack";
+    data: {
+        bid: string;
+    };
+};
+
+// #endregion

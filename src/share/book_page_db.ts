@@ -1,11 +1,14 @@
-/** 存储书籍每一页的内容到 IndexedDB，此处统一操作 */
+/** 存储书籍每一页的内容到 IndexedDB，此处统一操作。
+ *
+ * 数据库设计见 `doc/about_book_db.md`
+ */
 
 import CureLogger from "./logger";
 
 const logger = new CureLogger("share/book_page_db");
 const DEBUG = {
-    /** 输出添加的页面内容 */
-    LOG_ADD_PAGE_DATA: false,
+    /** 输出添加到数据库的每一项数据 */
+    LOG_ADD_ITEM: false,
 };
 
 /** 书籍内容存储 —— 单例模式
@@ -24,16 +27,12 @@ const DEBUG = {
 export default class CureBookPageDB {
     private static instance?: CureBookPageDB;
 
-    private db_name = chrome.runtime.getManifest().name;
-    private store_name = "book_pages";
+    private readonly db_name_prefix = chrome.runtime.getManifest().name;
+    private readonly store_name = "book_pages";
+    /** 存储所有数据库连接 */
+    private readonly db_map = new Map<string, OneBookDBConnection>();
 
-    private db: IDBDatabase | null = null;
-    /** 数据库是否初始化完成 */
-    private initialized = false;
-
-    private constructor() {
-        this.init();
-    }
+    private constructor() {}
 
     static get Instance() {
         if (this.instance === undefined) {
@@ -42,42 +41,60 @@ export default class CureBookPageDB {
         return this.instance;
     }
 
-    private async init() {
-        const self = this;
+    // #region db map helper method
 
-        if (self.initialized) {
+    private get_book_conn(bid: string): OneBookDBConnection {
+        return this.db_map.get(bid) || { bid, db: null, initialized: false };
+    }
+
+    private save_book_conn(conn: OneBookDBConnection) {
+        this.db_map.set(conn.bid, conn);
+    }
+
+    // #endregion
+
+    /** 为书籍 `bid` 初始化其数据库 */
+    async init(bid: string) {
+        const self = this;
+        const conn = self.get_book_conn(bid);
+        if (conn.initialized) {
             return;
         }
-        self.initialized = true;
+        conn.initialized = true;
 
         return new Promise<void>((resolve, reject) => {
-            const req = indexedDB.open(self.db_name, 3);
-            req.onsuccess = (e) => {
-                logger.log(`open database success`);
-                self.db = (e.target as IDBOpenDBRequest).result;
+            const db_name = `${self.db_name_prefix}-${bid}`;
+            const req = indexedDB.open(db_name, 1);
+            req.onsuccess = async (e) => {
+                logger.log(`open database success`, db_name);
+                conn.db = (e.target as IDBOpenDBRequest).result;
+                self.save_book_conn(conn);
                 resolve();
             };
             req.onerror = (e) => {
-                logger.error(`open database failed`, e);
+                logger.error(`open database failed`, db_name, ", error:", e);
+                reject();
+            };
+            req.onblocked = (e) => {
+                logger.error(`open database blocked`, db_name, ", error:", e);
                 reject();
             };
             req.onupgradeneeded = (e) => {
                 const db = (e.target as IDBOpenDBRequest).result;
+                // #cure-tip init book pages object store
                 if (!db.objectStoreNames.contains(self.store_name)) {
                     const obs = db.createObjectStore(self.store_name, {
                         keyPath: "id",
-                        autoIncrement: true,
+                        autoIncrement: false,
                     });
-                    // 后续会通过 book id 来查找，所以需要建立索引
-                    obs.createIndex("bid", "bid", { unique: false });
-                    // 作为页面的唯一标识，需要建立索引，避免重复添加
-                    obs.createIndex("unique_id", "unique_id", { unique: true });
                     obs.transaction.oncomplete = () => {
                         resolve();
                     };
                     obs.transaction.onerror = (e) => {
                         logger.error(
-                            `create <${self.store_name}> object store failed`,
+                            `create object store book_pages failed`,
+                            db_name,
+                            ", error:",
                             e,
                         );
                         reject();
@@ -110,13 +127,11 @@ export default class CureBookPageDB {
         filename?: string,
         type?: ContentKind,
     ): Promise<boolean> {
-        if (this.db === null) {
-            try {
-                await this.init();
-            } catch (e) {
-                logger.error("init db failed", e);
-                return false;
-            }
+        try {
+            await this.init(bid);
+        } catch (e) {
+            logger.error("init db failed", e);
+            return false;
         }
 
         if (mode === "pdf") {
@@ -131,15 +146,10 @@ export default class CureBookPageDB {
                 return false;
             }
 
-            const unique_id =
-                type === "xhtml"
-                    ? `${bid}-${chapter}-${page}`
-                    : `${bid}-${filename}`;
-
             const data: BookPageStoreItem = {
+                id: type === "xhtml" ? `${chapter}-${page}` : filename,
                 bid,
                 pid: `${chapter}-${page}`,
-                unique_id,
                 mode,
                 filename,
                 content,
@@ -161,7 +171,8 @@ export default class CureBookPageDB {
     private async save_epub_one_page(
         data: BookPageStoreItem,
     ): Promise<boolean> {
-        const req = this.db
+        const db = this.get_book_conn(data.bid).db;
+        const req = db
             ?.transaction(this.store_name, "readwrite")
             .objectStore(this.store_name)
             ?.add(data);
@@ -172,7 +183,7 @@ export default class CureBookPageDB {
 
         return new Promise((resolve, reject) => {
             req.onsuccess = () => {
-                DEBUG.LOG_ADD_PAGE_DATA &&
+                DEBUG.LOG_ADD_ITEM &&
                     logger.log("save_epub_one_page data ok", data);
                 resolve(true);
             };
@@ -180,9 +191,9 @@ export default class CureBookPageDB {
                 const err = (e.target as IDBRequest).error;
                 if (
                     err?.name === "ConstraintError" &&
-                    err?.message.includes("unique_id")
+                    err?.message === "Key already exists in the object store."
                 ) {
-                    DEBUG.LOG_ADD_PAGE_DATA &&
+                    DEBUG.LOG_ADD_ITEM &&
                         logger.warn("save_epub_one_page data exist", data);
 
                     return resolve(true);
@@ -197,69 +208,20 @@ export default class CureBookPageDB {
 
     // #region get page
 
-    /** 获取书籍某一页的内容
-     * @param bid 书籍的 id
-     * @param mode 该书籍的阅读模式
-     * @param page 页数
-     * @param chapter 章节数，仅 epub 需要此参数
-     *
-     */
-    async get_one_page(
-        bid: string,
-        mode: ReadMode,
-        page: number,
-        chapter?: number,
-    ): Promise<string | undefined> {
-        if (this.db === null) {
-            try {
-                await this.init();
-            } catch (e) {
-                logger.error("init db failed", e);
-                return;
-            }
-        }
-
-        if (mode === "pdf") {
-            return await this.get_pdf_one_page(page);
-        } else if (mode === "epub") {
-            if (chapter === undefined) {
-                logger.error("epub mode need chapter number");
-                return undefined;
-            }
-            return await this.get_epub_one_page(page, chapter);
-        }
-
-        throw new Error(`unknown mode: ${mode}`);
-    }
-
-    private async get_pdf_one_page(page: number): Promise<string | undefined> {
-        throw new Error("Method not implemented.");
-    }
-
-    private async get_epub_one_page(
-        page: number,
-        chapter: number,
-    ): Promise<string | undefined> {
-        throw new Error("Method not implemented.");
-    }
-
     /** 获取书籍的所有页内容 */
     async get_all_pages(bid: string): Promise<BookPageStoreItem[]> {
-        if (this.db === null) {
-            try {
-                await this.init();
-            } catch (e) {
-                logger.error("init db failed", e);
-                return [];
-            }
+        try {
+            await this.init(bid);
+        } catch (e) {
+            logger.error("init db failed", e);
+            return [];
         }
 
-        // 基于索引 bid 查找所有内容
-        const req = this.db
+        const db = this.get_book_conn(bid).db;
+        const req = db
             ?.transaction(this.store_name, "readonly")
             .objectStore(this.store_name)
-            ?.index("bid")
-            ?.getAll(bid);
+            ?.getAll();
 
         if (req === undefined) {
             return [];
@@ -278,22 +240,44 @@ export default class CureBookPageDB {
 
     // #endregion
 
-    /** 删除数据库 */
-    async remove() {
-        this?.db?.close();
-        const req = indexedDB.deleteDatabase(this.db_name);
+    // #region helper
+
+    /** 断开数据库的连接 */
+    async exit_conn(bid: string) {
+        const conn = this.get_book_conn(bid);
+        conn.db?.close();
+    }
+
+    /** 删除指定数据库 */
+    async remove(bid: string) {
+        const conn = this.get_book_conn(bid);
+        if (conn.db === null) {
+            this.db_map.delete(bid);
+            return;
+        }
+
+        const db_name = conn.db.name;
+        conn.db.close();
+        const req = indexedDB.deleteDatabase(db_name);
         req.onsuccess = () => {
-            logger.log("remove db success");
-            this.initialized = false;
+            logger.log("remove db success", db_name);
         };
         req.onerror = () => {
-            logger.error("remove db failed");
+            logger.error("remove db failed", db_name);
         };
     }
 
+    /** 删除所有数据库 */
+    async remove_all() {
+        for (const bid of this.db_map.keys()) {
+            await this.remove(bid);
+        }
+    }
+
     /** 输出所有页面数据，仅用于调试 */
-    async show_all_data() {
-        const req = this.db
+    async show_all_data(bid: string) {
+        const conn = this.get_book_conn(bid);
+        const req = conn.db
             ?.transaction(this.store_name, "readonly")
             ?.objectStore(this.store_name)
             ?.getAll();
@@ -303,11 +287,9 @@ export default class CureBookPageDB {
         }
 
         req.onsuccess = () => {
-            logger.log("show_all_data", req.result);
+            logger.log("show_all_data", conn.db?.name, ", result:", req.result);
         };
     }
-
-    // #region helper
 
     // #endregion
 }

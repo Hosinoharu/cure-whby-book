@@ -13,19 +13,18 @@ type OneBookData = OneBookSimpleData & {
 
 /** 存储书籍内容到数据库中时，表示一项数据（也就是一页的内容） */
 type BookPageStoreItem = {
-    /** 书籍的 id */
+    /** 它作为每一页的唯一 id，其构成为
+     * - 当保存为 xhtml 时，其构成为 `${chapter 章节编号}-${page 页码}`，这才是唯一的！
+     * - 当保存为 css、img 时，它本身就是唯一的，所以使用文件名 `${filename}`
+     */
+    id: `${number}-${number}` | string;
+    /** 书籍的 id，表示该页属于哪本书籍 */
     bid: string;
     /** 在存储时每一页的 id
      * - 对于 pdf 文件，是页码
      * - 对于 epub 文件，是`章节的 id + 页码`，例如 `1-1`
      */
     pid: string;
-    /** 避免重复写入，它作为每一页的唯一 id，其构成为
-     *
-     * 当保存为 xhtml 时，其构成为 `${bid}-${chapter}-${page}`，这才是唯一的！
-     * 当保存为 css、img 时，它本身就是唯一的，所以其构成为 `${bid}-${filename}`
-     */
-    unique_id: string;
     /** 表示存储的是该阅读模式下的页面 */
     mode: ReadMode;
     /** 该页的名称，只有 epub 才有 */
@@ -36,4 +35,10 @@ type BookPageStoreItem = {
     content: string;
     /** 存储的内容格式，它也可以存储静态文件哟 */
     type: ContentKind;
+};
+
+type OneBookDBConnection = {
+    bid: string;
+    db: IDBDatabase | null;
+    initialized: boolean;
 };

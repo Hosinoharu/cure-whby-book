@@ -54,17 +54,30 @@ async function start() {
         return;
     }
 
-    // 发送消息给 background 让它启动
-    await chrome.runtime.sendMessage({
-        tabId: tab.id,
-        bid,
-    });
+    // #cure-tip 发送消息给 background 让它启动
+    const data: MsgStartDebugger = {
+        type: "start-debugger",
+        data: {
+            tabId: tab.id,
+            bid,
+        },
+    };
+    await chrome.runtime.sendMessage(data);
 }
 
 /** 下载指定的书籍 */
 async function download_book(bid: string) {
     const book_data = await BookStorageHelper.get_book_data(bid);
     if (book_data) {
+        // #cure-tip 需要先让 background 断开该数据库的连接
+        const data: MsgStartPack = {
+            type: "start-pack",
+            data: {
+                bid,
+            },
+        };
+        await chrome.runtime.sendMessage(data);
+
         const book_pages = await CureBookPageDB.Instance.get_all_pages(bid);
         if (book_pages.length > 0) {
             const gen = new CureEpubGenerator(book_data, book_pages);
