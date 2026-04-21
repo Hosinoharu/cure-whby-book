@@ -4,14 +4,15 @@ const raw_log = console.log;
 const raw_error = console.error;
 
 export default class CureLogger {
-    private readonly cure_idol = "#FE5B9B";
-    private readonly cure_wink = "#4060EE";
-    private readonly cure_kyun = "#CD5FFB";
+    private readonly cure_answer = "#C576FF";
+    private readonly cure_mystique = "#FE6998";
+    private readonly cure_eclair = "#40B9E1";
+    private readonly cure_arcana_shadow = "#5C438A";
     private readonly base_style =
         "color:white; font-weight:bold; border-radius:3px; padding:2px 5px;";
-    private readonly log_style = `background-color:${this.cure_idol};${this.base_style}`;
-    private readonly warn_style = `background-color:${this.cure_wink};${this.base_style}`;
-    private readonly error_style = `background-color:${this.cure_kyun};${this.base_style}`;
+    private readonly log_style = `background-color:${this.cure_answer};${this.base_style}`;
+    private readonly warn_style = `background-color:${this.cure_mystique};${this.base_style}`;
+    private readonly error_style = `background-color:${this.cure_eclair};${this.base_style}`;
     private readonly time_prefix_style = "color:#aaa";
 
     constructor(private prefix: string) {}

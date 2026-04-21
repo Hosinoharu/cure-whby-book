@@ -245,6 +245,7 @@ ${spine_item.join("\n")}
         });
         const url = URL.createObjectURL(blob);
         try {
+            // #cure-todo 下载完成之后自动清理数据库保存的书籍信息？还是手动清除？
             const downloadId = await chrome.downloads.download({
                 url,
                 filename: `${this.book_data.name}(${this.book_data.author}).epub`,
@@ -252,8 +253,6 @@ ${spine_item.join("\n")}
             });
         } catch (e) {
             logger.error("download epub error", e);
-        } finally {
-            URL.revokeObjectURL(url);
         }
     }
 }
