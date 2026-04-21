@@ -242,35 +242,53 @@ export default class CureBookPageDB {
 
     // #region helper
 
-    /** 断开数据库的连接 */
-    async exit_conn(bid: string) {
+    /** 断开数据库的连接，并返回该数据库的名字 */
+    exit_conn(bid: string) {
         const conn = this.get_book_conn(bid);
-        conn.db?.close();
+        let db_name: string | undefined;
+        if (conn.db !== null) {
+            db_name = conn.db.name;
+            conn.db.close();
+        }
+        this.db_map.delete(bid);
+        db_name && logger.log("exit conn", db_name);
+        return db_name;
     }
 
     /** 删除指定数据库 */
     async remove(bid: string) {
-        const conn = this.get_book_conn(bid);
-        if (conn.db === null) {
-            this.db_map.delete(bid);
-            return;
-        }
+        const db_name = this.exit_conn(bid);
+        db_name && (await this.raw_remove(db_name));
+    }
 
-        const db_name = conn.db.name;
-        conn.db.close();
+    /** 删除一个数据库 */
+    async raw_remove(db_name: string) {
         const req = indexedDB.deleteDatabase(db_name);
-        req.onsuccess = () => {
-            logger.log("remove db success", db_name);
-        };
-        req.onerror = () => {
-            logger.error("remove db failed", db_name);
-        };
+        new Promise<void>((resolve, reject) => {
+            req.onsuccess = () => {
+                logger.log("remove db success", db_name);
+                resolve();
+            };
+            req.onerror = (e) => {
+                logger.error("remove db failed", db_name, ", error:", e);
+                reject();
+            };
+        });
     }
 
     /** 删除所有数据库 */
     async remove_all() {
+        // 先删除现有保存的
         for (const bid of this.db_map.keys()) {
             await this.remove(bid);
+        }
+
+        // 当插件第一次安装时，需要找出已经存在的数据库
+        // 该 API 可以获取当前有哪些数据库，似乎不是标准 API？？？
+        for (const item of await indexedDB.databases()) {
+            if (item.name?.startsWith(this.db_name_prefix)) {
+                await this.raw_remove(item.name);
+            }
         }
     }
 

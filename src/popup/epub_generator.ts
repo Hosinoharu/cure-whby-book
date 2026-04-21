@@ -11,9 +11,7 @@ import CureLogger from "@/share/logger";
 const logger = new CureLogger("popup/epub_generator");
 const DEBUG = {
     /* 输出生成 content.opf 文件的内容 */
-    LOG_OPF: true,
-    /* 输出生成 toc.ncx 文件的内容 */
-    LOG_NCX: true,
+    LOG_OPF: false,
 };
 
 /**
@@ -100,7 +98,11 @@ ${tag_spine}
     }
 
     /** 生成 `OEBPS/content.opf` 文件的 `metadata` 标签  */
-    private gen_opf_tag_metadata() {
+    private gen_opf_tag_metadata(cover_img_id?: string) {
+        const cover_meta = cover_img_id
+            ? `<meta content="${cover_img_id}" name="cover"/>`
+            : "";
+
         return `
 <metadata xmlns:dc="http://purl.org/dc/elements/1.1/">
     <dc:identifier id="ISBN">${this.book_data.isbn}</dc:identifier>
@@ -110,6 +112,7 @@ ${tag_spine}
     <dc:publisher>${this.book_data.pub}</dc:publisher>
     <dc:date>${this.book_data.date}</dc:date>
     <meta property="dcterms:modified">${this.gen_current_date()}</meta>
+    ${cover_meta}
 </metadata>`;
     }
 
@@ -124,6 +127,11 @@ ${tag_spine}
         /** 插入到 manifest 中的、所有关于图片的 item */
         const img_item: string[] = [];
         let img_index = 0;
+        /** 还是为 epub 2 考虑一下，新增对应 meta 标签，因为我用的 epub 阅读器居然不能识别 epub 3？？
+         * The meta element also allows EPUB creators to identify a cover image
+         * for EPUB 2 reading systems.
+         */
+        let cover_img_id: string | undefined = undefined;
         /** 插入到 spine 中的、所有关于 xhtml 的 item */
         const spine_item: string[] = [];
 
@@ -142,7 +150,7 @@ ${tag_spine}
             switch (item.type) {
                 case "xhtml":
                     this.write_one_xhtml_file(item.filename, item.content);
-                    // #cure-warn 判断目录文件，并记录 id
+                    // #cure-warn 判断目录文件，并标记它
                     // 根据文件名来判断似乎不可靠，但我也没有什么好办法啦
                     const is_nav = item.filename === "content.xhtml";
                     // Exactly one manifest item must declare the "nav" property
@@ -163,8 +171,21 @@ ${tag_spine}
                     break;
                 case "img":
                     this.write_one_img_file(item.filename, item.content);
+                    // #cure-warn 判断封面图片文件，并标记它
+                    // 根据文件名来判断似乎不可靠，但我也没有什么好办法啦
+                    const is_cover = item.filename === "cover.jpg";
+                    if (is_cover) {
+                        cover_img_id = `img-${img_index}`;
+                    }
+                    // In EPUB 3, the cover image must be identified
+                    // using the cover-image property on the manifest item for the image.
+                    const img_properties = is_cover
+                        ? // https://www.w3.org/TR/epub-33/#sec-cover-image
+                          'properties="cover-image"'
+                        : "";
+
                     img_item.push(
-                        `<item id="img-${img_index}" media-type="image/jpeg" href="images/${item.filename}" />`,
+                        `<item id="img-${img_index}" ${img_properties} media-type="image/jpeg" href="images/${item.filename}" />`,
                     );
                     img_index++;
                     break;
@@ -175,7 +196,7 @@ ${tag_spine}
             }
         });
 
-        const tag_metadata = this.gen_opf_tag_metadata();
+        const tag_metadata = this.gen_opf_tag_metadata(cover_img_id);
 
         // https://www.w3.org/TR/epub-33/#sec-pkg-manifest
         const tag_manifest = `

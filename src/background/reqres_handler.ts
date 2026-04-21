@@ -58,12 +58,14 @@ chrome.runtime.onMessage.addListener(
                 const { tabId, bid } = request.data;
                 if (await CureWhbyBookManager.save_book_simple_data(bid)) {
                     await start_debugger(tabId);
+                    // #cure-tip 开启监听之后，立即创建数据库
+                    await CureBookPageDB.Instance.init(bid);
                 } else {
                     logger.error("save book simple data error");
                 }
                 break;
             case "start-pack":
-                await CureBookPageDB.Instance.exit_conn(request.data.bid);
+                CureBookPageDB.Instance.exit_conn(request.data.bid);
                 sendResponse();
                 break;
         }
