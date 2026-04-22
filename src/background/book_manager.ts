@@ -4,7 +4,7 @@ import { BookStorageHelper } from "@/share/storage";
 import CureLogger from "@/share/logger";
 import CryptoJS from "crypto-js";
 import CureBookPageDB from "@/share/book_page_db";
-import { BOOK_HOST, BOOK_SIMPLE_DATA, BOOK_CATALOG } from "./target_api";
+import { BOOK_HOST, BOOK_SIMPLE_DATA, BOOK_CATALOG } from "@/share/target_api";
 
 const logger = new CureLogger("bg/book_manager");
 const DEBUG = {

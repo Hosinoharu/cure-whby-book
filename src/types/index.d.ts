@@ -56,6 +56,14 @@ interface ICureWhbyDownloader {
     save_one_page(page: number, content: string): unknown;
 }
 
+/** 从一些 URL 中可以提取出来的信息 */
+type DataFromUrl = {
+    bid?: string;
+    page?: string;
+    chapter?: string;
+    filename?: string;
+};
+
 // #region background 和 popup 通信的数据格式
 
 /** background 和 popup 通信的数据格式 */

@@ -2,7 +2,7 @@
 
 import Protocol from "devtools-protocol";
 import CureLogger from "@/share/logger";
-import * as target_api from "./target_api";
+import * as target_api from "@/share/target_api";
 import { CureWhbyBookManager } from "./book_manager";
 import CureBookPageDB from "@/share/book_page_db";
 
@@ -199,8 +199,8 @@ function should_decode_res(req_url: string) {
     // 在拿到书籍的内容时，不需要再进行一次 base64 decode，直接拿去进行解密处理就好
     // 拿到 epub 中需要的图片时，也不需要解码
     if (
-        target_api.BOOK_EPUB_MODE_ONE_PAGE.urlpattern.test(req_url) ||
-        target_api.BOOK_EPUB_MODE_PAGE_IMAGE.urlpattern.test(req_url)
+        target_api.get_data_from_epub_mode_one_page(req_url) ||
+        target_api.get_data_from_epub_mode_page_image(req_url)
     ) {
         result = false;
     }
@@ -235,14 +235,11 @@ async function handle_book_content(
 ): Promise<boolean> {
     let handled = false;
 
-    const is_pdf_book_content =
-        target_api.BOOK_PDF_MODE_SPLIT_IMAGE.urlpattern.exec(url);
+    const is_pdf = target_api.get_data_from_pdf_split_image(url);
     // pdf mode
-    if (is_pdf_book_content !== null) {
+    if (is_pdf !== null) {
         handled = true;
-        const bid = is_pdf_book_content.pathname.groups["bid"];
-        const page = is_pdf_book_content.pathname.groups["page"];
-
+        const { bid, page } = is_pdf;
         if (bid !== undefined && page !== undefined) {
             await handle_pdf_book_content(bid, parseInt(page), content);
         } else {
@@ -254,15 +251,10 @@ async function handle_book_content(
     }
     // epub mode
     else {
-        const is_epub_book_content =
-            target_api.BOOK_EPUB_MODE_ONE_PAGE.urlpattern.exec(url);
-        if (is_epub_book_content !== null) {
+        const is_epub = target_api.get_data_from_epub_mode_one_page(url);
+        if (is_epub !== null) {
             handled = true;
-            const bid = is_epub_book_content.pathname.groups["bid"];
-            const page = is_epub_book_content.pathname.groups["page"];
-            const chapter = is_epub_book_content.pathname.groups["chapter"];
-            const filename = is_epub_book_content.pathname.groups["filename"];
-
+            const { bid, page, chapter, filename } = is_epub;
             if (
                 bid !== undefined &&
                 page !== undefined &&
@@ -349,8 +341,8 @@ async function handle_epub_book_assets(
     let handled = false;
     let type: ContentKind | undefined;
 
-    let final_pattern_result: URLPatternResult | null = null;
-    const is_css = target_api.BOOK_EPUB_MODE_PAGE_CSS.urlpattern.exec(url);
+    let final_pattern_result: DataFromUrl | null = null;
+    const is_css = target_api.get_data_from_epub_mode_page_css(url);
     // css
     if (is_css !== null) {
         handled = true;
@@ -359,10 +351,9 @@ async function handle_epub_book_assets(
     }
     // image
     else {
-        handled = true;
-        const is_img =
-            target_api.BOOK_EPUB_MODE_PAGE_IMAGE.urlpattern.exec(url);
+        const is_img = target_api.get_data_from_epub_mode_page_image(url);
         if (is_img !== null) {
+            handled = true;
             final_pattern_result = is_img;
             type = "img";
         }
@@ -370,11 +361,7 @@ async function handle_epub_book_assets(
 
     // 可以统一操作，提取相同的信息
     if (final_pattern_result !== null) {
-        const bid = final_pattern_result.pathname.groups["bid"];
-        const page = final_pattern_result.pathname.groups["page"];
-        const chapter = final_pattern_result.pathname.groups["chapter"];
-        const filename = final_pattern_result.pathname.groups["filename"];
-
+        const { bid, page, chapter, filename } = final_pattern_result;
         // 额...下面这个缩进、格式，有点费眼睛呀
         if (
             bid !== undefined &&

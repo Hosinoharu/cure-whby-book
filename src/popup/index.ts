@@ -2,6 +2,7 @@ import CureBookPageDB from "@/share/book_page_db";
 import { BookStorageHelper } from "@/share/storage";
 import CureEpubGenerator from "./epub_generator";
 import CureLogger from "@/share/logger";
+import { get_data_from_read_page } from "@/share/target_api";
 
 const logger = new CureLogger("popup");
 
@@ -18,23 +19,12 @@ document.querySelector("#download")?.addEventListener("click", async () => {
         return null;
     }
 
-    const bid = await get_book_id(tab.url);
+    const bid = get_data_from_read_page(tab.url)?.bid;
     if (bid === null) {
         return;
     }
     download_book(bid);
 });
-
-/** 获取当前标签页 url 并提取出书籍的 bid */
-async function get_book_id(s: string) {
-    const url = new URL(s);
-    const bid = url.searchParams.get("bid");
-    if (bid === null) {
-        logger.error("can not get bid from url", s);
-        return null;
-    }
-    return bid;
-}
 
 /** 开启响应拦截 */
 async function start() {
@@ -49,7 +39,7 @@ async function start() {
         return null;
     }
 
-    const bid = await get_book_id(tab.url);
+    const bid = get_data_from_read_page(tab.url)?.bid;
     if (bid === null) {
         return;
     }

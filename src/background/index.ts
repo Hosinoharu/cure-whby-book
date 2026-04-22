@@ -1,7 +1,7 @@
 import CureBookPageDB from "@/share/book_page_db";
 import "./reqres_handler";
 import CureLogger from "@/share/logger";
-import { BOOK_READER_PAGE } from "./target_api";
+import { get_data_from_read_page } from "@/share/target_api";
 
 const logger = new CureLogger("Cure Whby Book");
 logger.log("Cure Cure ~\\(≧▽≦)/~");
@@ -56,11 +56,8 @@ async function set_extension_status_on_tab(tabId: number, url?: string) {
         return;
     }
 
-    const pattern = BOOK_READER_PAGE.exec(url);
-    const mode = pattern?.pathname.groups?.mode as ReadMode | undefined;
-    const bid = pattern?.search.groups?.bid as string | undefined;
-
-    if (mode && bid) {
+    const { mode, bid } = get_data_from_read_page(url);
+    if (bid && (mode === "epub" || mode === "pdf")) {
         await enable_extension(tabId);
     } else {
         await disable_extension(tabId);

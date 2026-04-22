@@ -7,12 +7,27 @@ export const BOOK_HOST = "https://wqbook.wqxuetang.com";
  * - 流失阅读模式下 `https://wqbook.wqxuetang.com/deep/read/epub?bid=3226854`
  * - 原貌阅读模式下 `https://wqbook.wqxuetang.com/deep/read/pdf?bid=3226854`
  */
-export const BOOK_READER_PAGE = new URLPattern({
-    protocol: "https",
-    hostname: "wqbook.wqxuetang.com",
-    pathname: "/deep/read/:mode",
-    search: "bid=:bid",
-});
+const BOOK_READER_PAGE = new URLPattern(
+    {
+        protocol: "https",
+        hostname: "wqbook.wqxuetang.com",
+        pathname: "/deep/read/:mode",
+        // 不能简单使用 "bid=:bid" ，因为 `bid` 后面可能还跟了其它东西
+        search: "*",
+    },
+    { ignoreCase: true },
+);
+
+/** 根据书籍阅读页的 url 获取书籍的阅读模式和书籍 id */
+export function get_data_from_read_page(url?: string) {
+    const match = BOOK_READER_PAGE.exec(url);
+    const search = new URLSearchParams(match?.search.input);
+
+    return {
+        mode: match?.pathname.groups.mode,
+        bid: search.get("bid"),
+    };
+}
 
 /** 获取书籍信息的 API，比如作者、书名、总页数等等。
  *
@@ -89,10 +104,26 @@ export const BOOK_PDF_MODE_SPLIT_IMAGE: TargetAPI = {
         resourceType: "Image",
         requestStage: "Response",
     },
-    urlpattern: new URLPattern({
-        pathname: "/deep/page/lmg/:bid/:page",
-    }),
+    urlpattern: new URLPattern(
+        {
+            pathname: "/deep/page/lmg/:bid/:page",
+        },
+        { ignoreCase: true },
+    ),
 };
+
+/** 根据 pdf 阅读模式下，小图片的 url 获取其中相关信息 */
+export function get_data_from_pdf_split_image(url?: string) {
+    const match = BOOK_PDF_MODE_SPLIT_IMAGE.urlpattern.exec(url);
+    if (!match) {
+        return null;
+    }
+
+    return {
+        bid: match.pathname.groups.bid,
+        page: match.pathname.groups.page,
+    };
+}
 
 // #region 流式阅读模式
 
@@ -113,10 +144,18 @@ export const BOOK_EPUB_MODE_ONE_PAGE: TargetAPI = {
         resourceType: "XHR",
         requestStage: "Response",
     },
-    urlpattern: new URLPattern({
-        pathname: "/deep/epub/read/:bid/:page/:chapter/:filename",
-    }),
+    urlpattern: new URLPattern(
+        {
+            pathname: "/deep/epub/read/:bid/:page/:chapter/:filename",
+        },
+        { ignoreCase: true },
+    ),
 };
+
+/** 在流式阅读模式中，根据请求的一页的 url 解析出其相关信息 */
+export function get_data_from_epub_mode_one_page(url: string) {
+    return get_data_from_url(BOOK_EPUB_MODE_ONE_PAGE, url);
+}
 
 /** 在【流式阅读模式】中，每一页内容都是 xhtml，它内部可能会包含所需要的 CSS，这是需要下载的。
  *
@@ -134,10 +173,18 @@ export const BOOK_EPUB_MODE_PAGE_CSS: TargetAPI = {
         resourceType: "Stylesheet",
         requestStage: "Response",
     },
-    urlpattern: new URLPattern({
-        pathname: "/deep/epub/read/:bid/:page/:chapter/css/:filename",
-    }),
+    urlpattern: new URLPattern(
+        {
+            pathname: "/deep/epub/read/:bid/:page/:chapter/css/:filename",
+        },
+        { ignoreCase: true },
+    ),
 };
+
+/** 在流式阅读模式中，根据请求的 css url 解析出其相关信息 */
+export function get_data_from_epub_mode_page_css(url: string) {
+    return get_data_from_url(BOOK_EPUB_MODE_PAGE_CSS, url);
+}
 
 /** 在【流式阅读模式】中，每一页内容都是 xhtml，它内部可能会包含所需要的图片，这是需要下载的。
  *
@@ -155,9 +202,32 @@ export const BOOK_EPUB_MODE_PAGE_IMAGE: TargetAPI = {
         resourceType: "Image",
         requestStage: "Response",
     },
-    urlpattern: new URLPattern({
-        pathname: "/deep/epub/read/:bid/:page/:chapter/images/:filename",
-    }),
+    urlpattern: new URLPattern(
+        {
+            pathname: "/deep/epub/read/:bid/:page/:chapter/images/:filename",
+        },
+        { ignoreCase: true },
+    ),
 };
 
+/** 在流式阅读模式中，根据请求的图片 url 解析出其相关信息 */
+export function get_data_from_epub_mode_page_image(url: string) {
+    return get_data_from_url(BOOK_EPUB_MODE_PAGE_IMAGE, url);
+}
+
 // #endregion
+
+/** 分离出来的、通用的方法 */
+function get_data_from_url(p: TargetAPI, url: string): DataFromUrl | null {
+    const match = p.urlpattern.exec(url);
+    if (!match) {
+        return null;
+    }
+
+    return {
+        bid: match.pathname.groups["bid"],
+        page: match.pathname.groups["page"],
+        chapter: match.pathname.groups["chapter"],
+        filename: match.pathname.groups["filename"],
+    };
+}
