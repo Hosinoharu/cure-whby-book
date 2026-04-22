@@ -14,6 +14,17 @@
         "default_popup": "popup/index.html",
         "default_icon": "icons/icon-64.png"
     },
+    "content_scripts": [
+        {
+            "matches": [
+                "https://wqbook.wqxuetang.com/deep/read/epub*",
+                "https://wqbook.wqxuetang.com/deep/read/pdf*"
+            ],
+            "js": [
+                "content/index.js"
+            ]
+        }
+    ],
     "background": {
         "service_worker": "background/service_worker.js",
         "type": "module"

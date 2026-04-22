@@ -2,6 +2,8 @@ import CureBookPageDB from "@/share/book_page_db";
 import "./reqres_handler";
 import CureLogger from "@/share/logger";
 import { get_data_from_read_page } from "@/share/target_api";
+import { start_debugger, stop_debugger } from "./reqres_handler";
+import { CureWhbyBookManager } from "./book_manager";
 
 const logger = new CureLogger("Cure Whby Book");
 logger.log("Cure Cure ~\\(≧▽≦)/~");
@@ -79,3 +81,49 @@ chrome.tabs.onActivated.addListener(async (activeInfo) => {
 });
 
 // #endregion
+
+// #cure-core 监听 popup 消息，开启标签页的 debugger
+chrome.runtime.onMessage.addListener(
+    async (request: MsgInBgAndPopup, sender, sendResponse) => {
+        logger.log("popup message", request);
+        switch (request.type) {
+            case "start-debugger":
+                sendResponse();
+                const { tabId, bid } = request.data;
+                if (await CureWhbyBookManager.save_book_simple_data(bid)) {
+                    await start_debugger(tabId);
+                    // #cure-tip 开启监听之后，立即创建数据库
+                    await CureBookPageDB.Instance.init(bid);
+                    await set_action_on_page(tabId, request.data.mode, true);
+                } else {
+                    logger.error("save book simple data error");
+                }
+                break;
+            case "start-pack":
+                CureBookPageDB.Instance.exit_conn(request.data.bid);
+                // #cure-tip 打包时取消响应拦截
+                await stop_debugger(request.data.tabId);
+                await set_action_on_page(
+                    request.data.tabId,
+                    request.data.mode,
+                    false,
+                );
+                sendResponse();
+                break;
+        }
+    },
+);
+
+/** 当开启调试后，需要通知 content scripts 进行翻页了
+ * 当关闭调试后，需要通知 content scripts 停止翻页
+ */
+async function set_action_on_page(tabId: number, mode: ReadMode, on: boolean) {
+    const data: MsgInBgAndContent = {
+        type: "set-auto",
+        data: {
+            mode,
+            on,
+        },
+    };
+    await chrome.tabs.sendMessage(tabId, data);
+}

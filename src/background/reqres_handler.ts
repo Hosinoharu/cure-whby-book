@@ -1,10 +1,9 @@
-/** 拦截请求与响应，完成书籍的下载 */
+/** 拦截请求与响应，完成书籍内容的下载 */
 
 import Protocol from "devtools-protocol";
 import CureLogger from "@/share/logger";
 import * as target_api from "@/share/target_api";
 import { CureWhbyBookManager } from "./book_manager";
-import CureBookPageDB from "@/share/book_page_db";
 
 const logger = new CureLogger("bg/reqres_handler");
 const DEBUG = {
@@ -48,33 +47,7 @@ export async function stop_debugger(tabId: number) {
     } catch {}
 }
 
-// #cure-tip 监听 popup 消息，开启标签页的 debugger
-chrome.runtime.onMessage.addListener(
-    async (request: MsgInBgAndPopup, sender, sendResponse) => {
-        logger.log("popup message", request);
-        switch (request.type) {
-            case "start-debugger":
-                sendResponse();
-                const { tabId, bid } = request.data;
-                if (await CureWhbyBookManager.save_book_simple_data(bid)) {
-                    await start_debugger(tabId);
-                    // #cure-tip 开启监听之后，立即创建数据库
-                    await CureBookPageDB.Instance.init(bid);
-                } else {
-                    logger.error("save book simple data error");
-                }
-                break;
-            case "start-pack":
-                CureBookPageDB.Instance.exit_conn(request.data.bid);
-                // #cure-tip 打包时取消响应拦截
-                await stop_debugger(request.data.tabId);
-                sendResponse();
-                break;
-        }
-    },
-);
-
-// #cure-tip 监听 cdp 消息并重写响应
+// #cure-core 监听 cdp 消息并重写响应
 chrome.debugger.onEvent.addListener(async (source, method, params) => {
     const req_url: string | undefined = (params as any).request?.url;
 

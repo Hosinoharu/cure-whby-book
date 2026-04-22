@@ -11,31 +11,15 @@ document.querySelector("#start")?.addEventListener("click", async () => {
 });
 
 document.querySelector("#download")?.addEventListener("click", async () => {
-    // #cure-test 测试打包，在当前阅读界面点击下载就可以
-    const tab = (
-        await chrome.tabs.query({ active: true, currentWindow: true })
-    )[0];
-    if (tab.id === undefined || tab.url === undefined) {
-        return null;
-    }
-
-    const bid = get_data_from_read_page(tab.url)?.bid;
-    if (bid === null) {
-        return;
-    }
-    download_book(bid);
+    await download_book();
 });
 
 /** 开启响应拦截 */
 async function start() {
     // #cure-test/warn 在阅读页面开启插件功能
     const tab_info = await get_tab_info();
-    if (tab_info === null) {
-        return;
-    }
-
-    const bid = get_data_from_read_page(tab_info.url)?.bid;
-    if (bid === null) {
+    const { bid, mode } = get_data_from_read_page(tab_info?.url);
+    if (!tab_info || !bid || !mode) {
         return;
     }
 
@@ -44,6 +28,7 @@ async function start() {
         type: "start-debugger",
         data: {
             tabId: tab_info.tabId,
+            mode,
             bid,
         },
     };
@@ -51,9 +36,11 @@ async function start() {
 }
 
 /** 下载指定的书籍 */
-async function download_book(bid: string) {
+async function download_book() {
+    // #cure-test 测试打包，在当前阅读界面点击下载就可以
     const tab_info = await get_tab_info();
-    if (tab_info === null) {
+    const { bid, mode } = get_data_from_read_page(tab_info?.url);
+    if (!tab_info || !bid || !mode) {
         return;
     }
 
@@ -64,6 +51,7 @@ async function download_book(bid: string) {
             type: "start-pack",
             data: {
                 bid,
+                mode,
                 tabId: tab_info.tabId,
             },
         };

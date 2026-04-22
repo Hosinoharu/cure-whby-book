@@ -24,7 +24,7 @@ export function get_data_from_read_page(url?: string) {
     const search = new URLSearchParams(match?.search.input);
 
     return {
-        mode: match?.pathname.groups.mode,
+        mode: match?.pathname.groups.mode as ReadMode | undefined,
         bid: search.get("bid"),
     };
 }

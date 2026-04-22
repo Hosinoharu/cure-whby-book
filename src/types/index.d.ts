@@ -75,7 +75,21 @@ type MsgInBgAndPopup = {
     type: "start-debugger" | "start-pack";
     data: {
         tabId: number;
+        mode: ReadMode;
         bid: string;
+    };
+};
+
+/** background 和 content 通信的数据格式 */
+type MsgInBgAndContent = {
+    /**
+     * set-action: 设置自动化操作，即翻页咯
+     */
+    type: "set-auto";
+    data: {
+        /** 不同阅读模式下的翻页逻辑不同 */
+        mode: ReadMode;
+        on: boolean;
     };
 };
 
