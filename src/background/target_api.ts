@@ -3,6 +3,17 @@
 /** 书籍首页前缀 */
 export const BOOK_HOST = "https://wqbook.wqxuetang.com";
 
+/** 阅读模式下的网站 URL，插件在该页面启用
+ * - 流失阅读模式下 `https://wqbook.wqxuetang.com/deep/read/epub?bid=3226854`
+ * - 原貌阅读模式下 `https://wqbook.wqxuetang.com/deep/read/pdf?bid=3226854`
+ */
+export const BOOK_READER_PAGE = new URLPattern({
+    protocol: "https",
+    hostname: "wqbook.wqxuetang.com",
+    pathname: "/deep/read/:mode",
+    search: "bid=:bid",
+});
+
 /** 获取书籍信息的 API，比如作者、书名、总页数等等。
  *
  * 原本是在【书籍阅读页】中拦截响应读取，但是其中包含的信息很少，

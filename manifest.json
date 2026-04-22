@@ -27,6 +27,7 @@
         "downloads"
     ],
     "host_permissions": [
-        "<all_urls>"
+        "https://wqbook.wqxuetang.com/deep/read/epub*",
+        "https://wqbook.wqxuetang.com/deep/read/pdf*"
     ]
 }
