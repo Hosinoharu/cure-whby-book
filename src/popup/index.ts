@@ -29,26 +29,21 @@ document.querySelector("#download")?.addEventListener("click", async () => {
 /** 开启响应拦截 */
 async function start() {
     // #cure-test/warn 在阅读页面开启插件功能
-    // https://wqbook.wqxuetang.com/deep/read/epub?bid=3244419
-    // https://wqbook.wqxuetang.com/deep/read/pdf?bid=3244419
-    // 从 url 中提取对应的 bid，然后获取书籍的基础信息咯
-    const tab = (
-        await chrome.tabs.query({ active: true, currentWindow: true })
-    )[0];
-    if (tab.id === undefined || tab.url === undefined) {
-        return null;
+    const tab_info = await get_tab_info();
+    if (tab_info === null) {
+        return;
     }
 
-    const bid = get_data_from_read_page(tab.url)?.bid;
+    const bid = get_data_from_read_page(tab_info.url)?.bid;
     if (bid === null) {
         return;
     }
 
     // #cure-tip 发送消息给 background 让它启动
-    const data: MsgStartDebugger = {
+    const data: MsgInBgAndPopup = {
         type: "start-debugger",
         data: {
-            tabId: tab.id,
+            tabId: tab_info.tabId,
             bid,
         },
     };
@@ -57,13 +52,19 @@ async function start() {
 
 /** 下载指定的书籍 */
 async function download_book(bid: string) {
+    const tab_info = await get_tab_info();
+    if (tab_info === null) {
+        return;
+    }
+
     const book_data = await BookStorageHelper.get_book_data(bid);
     if (book_data) {
         // #cure-tip 需要先让 background 断开该数据库的连接
-        const data: MsgStartPack = {
+        const data: MsgInBgAndPopup = {
             type: "start-pack",
             data: {
                 bid,
+                tabId: tab_info.tabId,
             },
         };
         await chrome.runtime.sendMessage(data);
@@ -74,4 +75,17 @@ async function download_book(bid: string) {
             gen.pack_and_download();
         }
     }
+}
+
+async function get_tab_info() {
+    const tab = (
+        await chrome.tabs.query({ active: true, currentWindow: true })
+    )[0];
+    if (tab.id === undefined || tab.url === undefined) {
+        return null;
+    }
+    return {
+        tabId: tab.id,
+        url: tab.url,
+    };
 }

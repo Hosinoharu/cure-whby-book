@@ -67,21 +67,14 @@ type DataFromUrl = {
 // #region background 和 popup 通信的数据格式
 
 /** background 和 popup 通信的数据格式 */
-type MsgInBgAndPopup = MsgStartDebugger | MsgStartPack;
-
-/** background 和 popup 通信的数据格式 —— 启动调试模式 */
-type MsgStartDebugger = {
-    type: "start-debugger";
+type MsgInBgAndPopup = {
+    /**
+     * start-debugger: 启动调试模式
+     * start-pack: 通知 bg 即将打包 epub 并下载
+     */
+    type: "start-debugger" | "start-pack";
     data: {
         tabId: number;
-        bid: string;
-    };
-};
-
-/** background 和 popup 通信的数据格式 —— 通知 bg 即将打包 epub 并下载 */
-type MsgStartPack = {
-    type: "start-pack";
-    data: {
         bid: string;
     };
 };

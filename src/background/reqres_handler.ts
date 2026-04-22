@@ -66,6 +66,8 @@ chrome.runtime.onMessage.addListener(
                 break;
             case "start-pack":
                 CureBookPageDB.Instance.exit_conn(request.data.bid);
+                // #cure-tip 打包时取消响应拦截
+                await stop_debugger(request.data.tabId);
                 sendResponse();
                 break;
         }
