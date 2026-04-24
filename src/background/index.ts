@@ -5,7 +5,7 @@ import { get_data_from_read_page } from "@/share/target_api";
 import { start_debugger, stop_debugger } from "./reqres_handler";
 import { CureWhbyBookManager } from "./book_manager";
 
-const logger = new CureLogger("Cure Whby Book");
+const logger = new CureLogger("bg/index");
 logger.log("Cure Cure ~\\(≧▽≦)/~");
 
 // #cure-tip 测试时应该保留下载的内容，方便后续快速测试 epub 打包
@@ -34,7 +34,7 @@ async function disable_extension(tabId: number) {
     await chrome.action.disable(tabId);
 }
 
-/** 在该标签页启用插件 */
+/** 可以在该标签页启用插件 */
 async function enable_extension(tabId: number) {
     // 如果标签页原本不是目标页面，插件被禁止使用
     // 现在调用本方法，就说明进行了刷新等操作，相当于重置了插件的状态了咯
@@ -50,6 +50,18 @@ async function enable_extension(tabId: number) {
     //     tabId,
     // });
     await chrome.action.enable(tabId);
+}
+
+/** 插件下载书籍时，添加一些展示状态
+ * - 下载书籍时，on 为 true
+ * - 非下载书籍时，on 为 false
+ */
+async function set_extension_downloading_status(tabId: number, on: boolean) {
+    const text = on ? "ON" : "";
+    // cure mystique
+    const color = on ? "#FE6998" : "#000000";
+    await chrome.action.setBadgeText({ text, tabId });
+    await chrome.action.setBadgeBackgroundColor({ color, tabId });
 }
 
 /** 判断当前网站是否为书籍的阅读页面，如果是，插件才能启用功能哟 */
@@ -82,6 +94,18 @@ chrome.tabs.onActivated.addListener(async (activeInfo) => {
 
 // #endregion
 
+// #cure-tip 手动关闭了标签页的调试
+chrome.debugger.onDetach.addListener(async (debuggee, reason) => {
+    const { tabId } = debuggee;
+    if (tabId && reason === "canceled_by_user") {
+        await set_extension_downloading_status(tabId, false);
+        // 不管什么情况，反正终止页面的自动化操作就行了
+        await set_action_on_page(tabId, "epub", false);
+        await set_action_on_page(tabId, "pdf", false);
+        logger.log("debugger detached", tabId);
+    }
+});
+
 // #cure-core 监听 popup 消息，开启标签页的 debugger
 chrome.runtime.onMessage.addListener(
     async (request: MsgInBgAndPopup, sender, sendResponse) => {
@@ -92,6 +116,7 @@ chrome.runtime.onMessage.addListener(
                 const { tabId, bid } = request.data;
                 if (await CureWhbyBookManager.save_book_simple_data(bid)) {
                     await start_debugger(tabId);
+                    await set_extension_downloading_status(tabId, true);
                     // #cure-tip 开启监听之后，立即创建数据库
                     await CureBookPageDB.Instance.init(bid);
                     await set_action_on_page(tabId, request.data.mode, true);
@@ -103,6 +128,10 @@ chrome.runtime.onMessage.addListener(
                 CureBookPageDB.Instance.exit_conn(request.data.bid);
                 // #cure-tip 打包时取消响应拦截
                 await stop_debugger(request.data.tabId);
+                await set_extension_downloading_status(
+                    request.data.tabId,
+                    false,
+                );
                 await set_action_on_page(
                     request.data.tabId,
                     request.data.mode,
