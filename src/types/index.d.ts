@@ -57,12 +57,21 @@ interface ICureWhbyDownloader {
 }
 
 /** 从一些 URL 中可以提取出来的信息 */
-type DataFromUrl = {
+type DataFromEpubUrl = {
     bid?: string;
     page?: string;
     chapter?: string;
     filename?: string;
 };
+
+type DataFromPdfUrl = {
+    bid?: string;
+    page?: string;
+    kvalue?: string;
+};
+
+/** 存储 6 个小图片的类型 */
+type PdfSplitImageContent = Record<1 | 2 | 3 | 4 | 5 | 6, string>;
 
 // #region background 和 popup 通信的数据格式
 

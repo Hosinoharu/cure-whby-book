@@ -5,6 +5,7 @@ import CureLogger from "@/share/logger";
 import CryptoJS from "crypto-js";
 import CureBookPageDB from "@/share/book_page_db";
 import { BOOK_HOST, BOOK_SIMPLE_DATA, BOOK_CATALOG } from "@/share/target_api";
+import decrypt_kvalue from "./decrypt_kvalue";
 
 const logger = new CureLogger("bg/book_manager");
 const DEBUG = {
@@ -18,6 +19,8 @@ const DEBUG = {
 
 /** 管理一本书籍的相关信息，包括下载等等 */
 export abstract class CureWhbyBookManager {
+    // #region 通用的方法
+
     /** 在提取书籍相关信息时进行简单的存在性校验，如果不存在，则输出 `error` 信息
      * @returns 成功则返回 `book_data` 自身
      */
@@ -131,6 +134,10 @@ export abstract class CureWhbyBookManager {
         return result;
     }
 
+    // #endregion
+
+    // #region 关于 epub
+
     /** 存储 epub 一页的内容 */
     static async save_epub_one_page(
         bid: string,
@@ -169,8 +176,11 @@ export abstract class CureWhbyBookManager {
         return ok;
     }
 
-    /** 当获取全部内容时，下载书籍到本地 */
-    abstract download_book(): void;
+    // #endregion
+
+    // #region 关于 pdf
+
+    // #endregion
 }
 
 /** 在流式阅读模式中，辅助获取书籍内容 */
@@ -272,5 +282,54 @@ abstract class EpubModeHelper {
     /** 将 base64 encode 的内容转为 bytes */
     private static base64_to_bytes(str: string) {
         return Uint8Array.from(atob(str), (c) => c.charCodeAt(0));
+    }
+}
+
+/** 在原貌阅读模式中，辅助获取书籍内容 */
+abstract class PdfModeHelper {
+    //
+}
+
+/** pdf 中的一页被拆分了 6 个小图片，需要统一管理它们  —— 单例模式 */
+export class PdfModeOnePageManager {
+    private static instance?: PdfModeOnePageManager;
+
+    /** 记录书籍 id 某一页的 6 个小图片
+     * - key: 书籍 id
+     * - value: { key: 页码, value: 6 个小图片 }
+     */
+    private imgs = new Map<string, Record<number, PdfSplitImageContent>>();
+
+    private constructor() {}
+
+    static get Instance() {
+        if (this.instance === undefined) {
+            this.instance = new PdfModeOnePageManager();
+        }
+        return this.instance;
+    }
+
+    /** 添加一个在小图片之前的请求信息 */
+    async add_before_img_req_info(
+        bid: string,
+        page: number,
+        kvalue: string,
+        content: string,
+    ) {
+        const decrypt_k = await decrypt_kvalue(kvalue);
+        logger.log(
+            "decrypt_k",
+            " bid:",
+            bid,
+            ", page:",
+            page,
+            ", decrypt result:",
+            decrypt_k,
+        );
+    }
+
+    /** 添加一个小图片的请求信息 */
+    add_img_req_info() {
+        //
     }
 }

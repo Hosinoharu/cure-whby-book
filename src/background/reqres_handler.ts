@@ -3,7 +3,7 @@
 import Protocol from "devtools-protocol";
 import CureLogger from "@/share/logger";
 import * as target_api from "@/share/target_api";
-import { CureWhbyBookManager } from "./book_manager";
+import { CureWhbyBookManager, PdfModeOnePageManager } from "./book_manager";
 
 const logger = new CureLogger("bg/reqres_handler");
 const DEBUG = {
@@ -26,6 +26,7 @@ export async function start_debugger(tabId: number) {
         const patterns: Protocol.Fetch.RequestPattern[] = [
             // pdf
             target_api.BOOK_PDF_MODE_SPLIT_IMAGE.fetch_req_pattern,
+            target_api.BOOK_PDF_MODE_BEFORE_SPLIT_IMAGE.fetch_req_pattern,
             // epub
             target_api.BOOK_EPUB_MODE_ONE_PAGE.fetch_req_pattern,
             target_api.BOOK_EPUB_MODE_PAGE_CSS.fetch_req_pattern,
@@ -65,8 +66,8 @@ chrome.debugger.onEvent.addListener(async (source, method, params) => {
     const requestId = (params as any).requestId as string;
 
     if (
-        requestId === undefined ||
-        tabId === undefined ||
+        !requestId ||
+        !tabId ||
         tabId === chrome.tabs.TAB_ID_NONE ||
         method !== "Fetch.requestPaused"
     ) {
@@ -77,7 +78,7 @@ chrome.debugger.onEvent.addListener(async (source, method, params) => {
     const temp = params as Protocol.Fetch.RequestPausedEvent;
 
     // request state
-    if (temp.responseStatusCode === undefined) {
+    if (!temp.responseStatusCode) {
         await send_fetch_continue_request(tabId, requestId);
     }
     // response state
@@ -171,11 +172,13 @@ function base64_decode_to_utf8(str: string) {
 function should_decode_res(req_url: string) {
     let result = true;
 
-    // 在拿到书籍的内容时，不需要再进行一次 base64 decode，直接拿去进行解密处理就好
-    // 拿到 epub 中需要的图片时，也不需要解码
     if (
+        // 在拿到书籍的内容时，不需要再进行一次 base64 decode，直接拿去进行解密处理就好
         target_api.get_data_from_epub_mode_one_page(req_url) ||
-        target_api.get_data_from_epub_mode_page_image(req_url)
+        // 拿到 epub 中需要的图片时，也不需要解码
+        target_api.get_data_from_epub_mode_page_image(req_url) ||
+        // pdf 中的图片也不需要解码
+        target_api.get_data_from_pdf_split_image(req_url)
     ) {
         result = false;
     }
@@ -209,14 +212,30 @@ async function handle_book_content(
     content: string,
 ): Promise<boolean> {
     let handled = false;
+    let type: "img" | "before-img" = "img";
+    // pdf split img
+    let is_pdf = target_api.get_data_from_pdf_split_image(url);
+    handled = is_pdf !== null;
+    // pdf before split img
+    if (!handled) {
+        is_pdf = target_api.get_data_from_pdf_before_split_image(url);
+        handled = is_pdf !== null;
+        if (handled) {
+            type = "before-img";
+        }
+    }
 
-    const is_pdf = target_api.get_data_from_pdf_split_image(url);
     // pdf mode
-    if (is_pdf !== null) {
-        handled = true;
-        const { bid, page } = is_pdf;
-        if (bid !== undefined && page !== undefined) {
-            await handle_pdf_book_content(bid, parseInt(page), content);
+    if (is_pdf) {
+        const { bid, page, kvalue } = is_pdf;
+        if (bid && page && kvalue) {
+            await handle_pdf_book_content(
+                bid,
+                parseInt(page),
+                kvalue,
+                content,
+                type,
+            );
         } else {
             logger.error(
                 "get book page info from pdf book content url failed. url: ",
@@ -227,15 +246,10 @@ async function handle_book_content(
     // epub mode
     else {
         const is_epub = target_api.get_data_from_epub_mode_one_page(url);
-        if (is_epub !== null) {
-            handled = true;
+        handled = is_epub !== null;
+        if (is_epub) {
             const { bid, page, chapter, filename } = is_epub;
-            if (
-                bid !== undefined &&
-                page !== undefined &&
-                chapter !== undefined &&
-                filename !== undefined
-            ) {
+            if (bid && page && chapter && filename) {
                 await handle_epub_book_content(
                     bid,
                     parseInt(page),
@@ -299,13 +313,38 @@ async function handle_epub_book_content(
         );
 }
 
+/** 处理关于 pdf 的内容
+ * @param kvalue 请求链接中的 k 参数值
+ * @param type  该请求的类型
+ * - "img"：访问的是小图片
+ * - "before_img"：访问的是小图片的前置请求
+ */
 async function handle_pdf_book_content(
     bid: string,
     page: number,
+    kvalue: string,
     content: string,
+    type: "img" | "before-img",
 ) {
     DEBUG.LOG_SAVE_BOOK_CONTENT &&
-        logger.log("get pdf book content.", "bid:", bid, ", page:", page);
+        logger.log(
+            "get pdf book content.",
+            "bid:",
+            bid,
+            ", page:",
+            page,
+            ", type:",
+            type,
+        );
+
+    if (type === "before-img") {
+        await PdfModeOnePageManager.Instance.add_before_img_req_info(
+            bid,
+            page,
+            kvalue,
+            content,
+        );
+    }
 }
 
 /** 处理 epub book 中的请求的 css、图片等静态文件 */
@@ -314,37 +353,26 @@ async function handle_epub_book_assets(
     content: string,
 ): Promise<boolean> {
     let handled = false;
-    let type: ContentKind | undefined;
+    let type: ContentKind = "css";
 
-    let final_pattern_result: DataFromUrl | null = null;
-    const is_css = target_api.get_data_from_epub_mode_page_css(url);
     // css
-    if (is_css !== null) {
-        handled = true;
-        final_pattern_result = is_css;
-        type = "css";
-    }
+    let final_pattern_result = target_api.get_data_from_epub_mode_page_css(url);
+    handled = final_pattern_result !== null;
     // image
-    else {
-        const is_img = target_api.get_data_from_epub_mode_page_image(url);
-        if (is_img !== null) {
-            handled = true;
-            final_pattern_result = is_img;
+    if (!handled) {
+        final_pattern_result =
+            target_api.get_data_from_epub_mode_page_image(url);
+        handled = final_pattern_result !== null;
+        if (handled) {
             type = "img";
         }
     }
 
     // 可以统一操作，提取相同的信息
-    if (final_pattern_result !== null) {
+    if (final_pattern_result) {
         const { bid, page, chapter, filename } = final_pattern_result;
         // 额...下面这个缩进、格式，有点费眼睛呀
-        if (
-            bid !== undefined &&
-            page !== undefined &&
-            chapter !== undefined &&
-            filename !== undefined &&
-            type !== undefined
-        ) {
+        if (bid && page && chapter && filename && type) {
             DEBUG.LOG_SAVE_BOOK_CONTENT &&
                 logger.log(
                     "get epub book assets",

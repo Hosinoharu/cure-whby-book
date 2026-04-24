@@ -21,8 +21,6 @@
 >
 >   我：不能说出其真名，只能看谁有缘了 `(￣▽￣)"`，你要是想知道的话，靠近点，再近点！我偷偷告诉你哟 :)
 
-最初是以 `python + proxy server` 方案实现，已经作废不维护，具体见仓库 `py-ver` 分支。
-
 # Tip
 
 只能在网页端下载书籍，不支持转换其自定义的书籍格式。
@@ -70,6 +68,3 @@
 # Attribution
 
 [Extension Icon](https://www.flaticon.com/free-icon/fairytale_5319040?related_id=5318)
-
-
-

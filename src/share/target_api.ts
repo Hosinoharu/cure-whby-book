@@ -85,6 +85,8 @@ export const BOOK_SIMPLE_DATA = `${BOOK_HOST}/api/v7/book/initbook?bid=`;
  */
 export const BOOK_CATALOG = `${BOOK_HOST}/deep/book/v1/catatree?bid=`;
 
+// #region 原貌阅读模式
+
 /** 在【原貌阅读模式】中，每一页内容的被拆分成了 6 个小图片
  *
  * 形如 `https://wqbook.wqxuetang.com/deep/page/lmg/3226417/5?k=...`
@@ -107,13 +109,16 @@ export const BOOK_PDF_MODE_SPLIT_IMAGE: TargetAPI = {
     urlpattern: new URLPattern(
         {
             pathname: "/deep/page/lmg/:bid/:page",
+            search: "k=:kvalue",
         },
         { ignoreCase: true },
     ),
 };
 
 /** 根据 pdf 阅读模式下，小图片的 url 获取其中相关信息 */
-export function get_data_from_pdf_split_image(url?: string) {
+export function get_data_from_pdf_split_image(
+    url?: string,
+): DataFromPdfUrl | null {
     const match = BOOK_PDF_MODE_SPLIT_IMAGE.urlpattern.exec(url);
     if (!match) {
         return null;
@@ -122,8 +127,50 @@ export function get_data_from_pdf_split_image(url?: string) {
     return {
         bid: match.pathname.groups.bid,
         page: match.pathname.groups.page,
+        kvalue: match.search.groups.kvalue,
     };
 }
+
+/** 正如上面所言，被拆分的 6 个小图片的拼接顺序是不确定的，需要根据在小图片之前的 6 个请求来确定！
+ *
+ * 形如 `https://wqbook.wqxuetang.com/deep/page/once/get?bid=3226854&pnum=3&k=...`
+ *
+ * 其中 `pnum` 表示该小图片所在的页数。
+ * 根据 `k` 值，可以和小图片的请求一一对应，其中也包含了小图片的顺序！
+ *
+ */
+export const BOOK_PDF_MODE_BEFORE_SPLIT_IMAGE: TargetAPI = {
+    fetch_req_pattern: {
+        urlPattern: "*deep/page/once/get*",
+        resourceType: "XHR",
+        requestStage: "Response",
+    },
+    urlpattern: new URLPattern(
+        {
+            pathname: "/deep/page/once/get",
+            search: "bid=:bid&pnum=:page&k=:kvalue",
+        },
+        { ignoreCase: true },
+    ),
+};
+
+/** 根据 pdf 阅读模式下，小图片之前的请求的 url 获取其中相关信息 */
+export function get_data_from_pdf_before_split_image(
+    url?: string,
+): DataFromPdfUrl | null {
+    const match = BOOK_PDF_MODE_BEFORE_SPLIT_IMAGE.urlpattern.exec(url);
+    if (!match) {
+        return null;
+    }
+
+    return {
+        bid: match.search.groups.bid,
+        page: match.search.groups.page,
+        kvalue: match.search.groups.kvalue,
+    };
+}
+
+// #endregion
 
 // #region 流式阅读模式
 
@@ -218,7 +265,7 @@ export function get_data_from_epub_mode_page_image(url: string) {
 // #endregion
 
 /** 分离出来的、通用的方法 */
-function get_data_from_url(p: TargetAPI, url: string): DataFromUrl | null {
+function get_data_from_url(p: TargetAPI, url: string): DataFromEpubUrl | null {
     const match = p.urlpattern.exec(url);
     if (!match) {
         return null;
