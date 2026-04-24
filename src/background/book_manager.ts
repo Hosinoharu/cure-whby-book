@@ -15,6 +15,8 @@ const DEBUG = {
     LOG_BOOK_PAGE_CONTENT: false,
     /** 在保存一页内容后，输出底层数据库的所有内容，仅用于调试哟 */
     LOG_ALL_BOOK_PAGES: false,
+    /** 输出解密 k 值时的日志 */
+    LOG_DECRYPT_K_VALUE: true,
 };
 
 /** 管理一本书籍的相关信息，包括下载等等 */
@@ -317,15 +319,16 @@ export class PdfModeOnePageManager {
         content: string,
     ) {
         const decrypt_k = await decrypt_kvalue(kvalue);
-        logger.log(
-            "decrypt_k",
-            " bid:",
-            bid,
-            ", page:",
-            page,
-            ", decrypt result:",
-            decrypt_k,
-        );
+        DEBUG.LOG_DECRYPT_K_VALUE &&
+            logger.log(
+                "decrypt_k",
+                " bid:",
+                bid,
+                ", page:",
+                page,
+                ", decrypt result:",
+                decrypt_k,
+            );
     }
 
     /** 添加一个小图片的请求信息 */
