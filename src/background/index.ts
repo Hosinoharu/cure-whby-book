@@ -4,6 +4,7 @@ import CureLogger from "@/share/logger";
 import { get_data_from_read_page } from "@/share/target_api";
 import { start_debugger, stop_debugger } from "./reqres_handler";
 import { CureWhbyBookManager } from "./book_manager";
+import { resolve } from "node:dns";
 
 const logger = new CureLogger("bg/index");
 logger.log("Cure Cure ~\\(≧▽≦)/~");
@@ -145,8 +146,15 @@ chrome.runtime.onMessage.addListener(
 
 /** 当开启调试后，需要通知 content scripts 进行翻页了
  * 当关闭调试后，需要通知 content scripts 停止翻页
+ *
+ * @param retry 标记本次调用是否为重试的调用，最多只能重试调用一次！
  */
-async function set_action_on_page(tabId: number, mode: ReadMode, on: boolean) {
+async function set_action_on_page(
+    tabId: number,
+    mode: ReadMode,
+    on: boolean,
+    retry?: boolean,
+) {
     const data: MsgInBgAndContent = {
         type: "set-auto",
         data: {
@@ -154,5 +162,28 @@ async function set_action_on_page(tabId: number, mode: ReadMode, on: boolean) {
             on,
         },
     };
-    await chrome.tabs.sendMessage(tabId, data);
+    try {
+        await chrome.tabs.sendMessage(tabId, data);
+    } catch (e: any) {
+        // 这是网页没有注入 content scripts 造成的错误，刷新网页重试即可
+        if (
+            e.message ===
+                "Could not establish connection. Receiving end does not exist." &&
+            !retry
+        ) {
+            await chrome.tabs.reload(tabId);
+            // #cure-maybe-bad 等待网页加载完成
+            // 这其实不稳妥，如果网页加载时间过长，则依然无用
+            // 方案一：标记当前下载某本书籍，content scripts 注入时，
+            // 可以获取书籍的 ID，从而自动检查 chrome storage 看是否下载，从而触发自动化
+            return new Promise<void>((resolve) => {
+                setTimeout(async () => {
+                    await set_action_on_page(tabId, mode, on, true);
+                    resolve();
+                }, 3000);
+            });
+        }
+
+        logger.error("set_action_on_page error", e.message);
+    }
 }
