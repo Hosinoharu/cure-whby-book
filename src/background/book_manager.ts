@@ -12,7 +12,7 @@ const DEBUG = {
     /** 输出获取到的书籍信息 */
     LOG_BOOK_DATA: true,
     /** 输出获取到的书籍某页的内容 */
-    LOG_BOOK_PAGE_CONTENT: true,
+    LOG_BOOK_PAGE_CONTENT: false,
     /** 在保存一页内容后，输出底层数据库的所有内容，仅用于调试哟 */
     LOG_ALL_BOOK_PAGES: false,
     /** 输出解密 k 值时的日志 */

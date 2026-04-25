@@ -4,7 +4,8 @@ import CureLogger from "@/share/logger";
 import { get_data_from_read_page } from "@/share/target_api";
 import { start_debugger, stop_debugger } from "./reqres_handler";
 import { CureWhbyBookManager } from "./book_manager";
-import { resolve } from "node:dns";
+import { start_auto_action, stop_auto_action } from "./auto_action";
+import { ExtensionConfigHelper } from "@/share/storage";
 
 const logger = new CureLogger("bg/index");
 logger.log("Cure Cure ~\\(≧▽≦)/~");
@@ -98,11 +99,10 @@ chrome.tabs.onActivated.addListener(async (activeInfo) => {
 // #cure-tip 手动关闭了标签页的调试
 chrome.debugger.onDetach.addListener(async (debuggee, reason) => {
     const { tabId } = debuggee;
-    if (tabId && reason === "canceled_by_user") {
+    if (tabId) {
         await set_extension_downloading_status(tabId, false);
-        // 不管什么情况，反正终止页面的自动化操作就行了
-        await set_action_on_page(tabId, "epub", false);
-        await set_action_on_page(tabId, "pdf", false);
+        await stop_auto_action();
+        await ExtensionConfigHelper.set_target_tab(null);
         logger.log("debugger detached", tabId);
     }
 });
@@ -118,72 +118,28 @@ chrome.runtime.onMessage.addListener(
                 if (await CureWhbyBookManager.save_book_simple_data(bid)) {
                     await start_debugger(tabId);
                     await set_extension_downloading_status(tabId, true);
-                    // #cure-tip 开启监听之后，立即创建数据库
+                    await ExtensionConfigHelper.set_target_tab(tabId);
+
+                    // #cure-tip 开启监听之后，立即创建数据库，并开启页面自动化翻页
                     await CureBookPageDB.Instance.init(bid);
-                    await set_action_on_page(tabId, request.data.mode, true);
+                    await start_auto_action(tabId);
                 } else {
                     logger.error("save book simple data error");
                 }
                 break;
             case "start-pack":
+                // #cure-tip 取消监听时需要第一时间断开数据库连接啦
                 CureBookPageDB.Instance.exit_conn(request.data.bid);
-                // #cure-tip 打包时取消响应拦截
                 await stop_debugger(request.data.tabId);
                 await set_extension_downloading_status(
                     request.data.tabId,
                     false,
                 );
-                await set_action_on_page(
-                    request.data.tabId,
-                    request.data.mode,
-                    false,
-                );
+                await ExtensionConfigHelper.set_target_tab(null);
+
+                await stop_auto_action();
                 sendResponse();
                 break;
         }
     },
 );
-
-/** 当开启调试后，需要通知 content scripts 进行翻页了
- * 当关闭调试后，需要通知 content scripts 停止翻页
- *
- * @param retry 标记本次调用是否为重试的调用，最多只能重试调用一次！
- */
-async function set_action_on_page(
-    tabId: number,
-    mode: ReadMode,
-    on: boolean,
-    retry?: boolean,
-) {
-    const data: MsgInBgAndContent = {
-        type: "set-auto",
-        data: {
-            mode,
-            on,
-        },
-    };
-    try {
-        await chrome.tabs.sendMessage(tabId, data);
-    } catch (e: any) {
-        // 这是网页没有注入 content scripts 造成的错误，刷新网页重试即可
-        if (
-            e.message ===
-                "Could not establish connection. Receiving end does not exist." &&
-            !retry
-        ) {
-            await chrome.tabs.reload(tabId);
-            // #cure-maybe-bad 等待网页加载完成
-            // 这其实不稳妥，如果网页加载时间过长，则依然无用
-            // 方案一：标记当前下载某本书籍，content scripts 注入时，
-            // 可以获取书籍的 ID，从而自动检查 chrome storage 看是否下载，从而触发自动化
-            return new Promise<void>((resolve) => {
-                setTimeout(async () => {
-                    await set_action_on_page(tabId, mode, on, true);
-                    resolve();
-                }, 3000);
-            });
-        }
-
-        logger.error("set_action_on_page error", e.message);
-    }
-}

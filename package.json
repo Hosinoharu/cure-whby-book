@@ -5,10 +5,8 @@
   "author": "Hosinoharu",
   "license": "MIT",
   "type": "module",
-  "main": "index.ts",
   "scripts": {
-    "build": "vite build && npm run build-content",
-    "build-content": "vite build --config vite.content.config.ts"
+    "build": "vite build"
   },
   "dependencies": {
     "crypto-js": "^4.2.0",

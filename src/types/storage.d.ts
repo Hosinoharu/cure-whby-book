@@ -1,8 +1,16 @@
 /** 插件的存储结构 */
 
 type StorageStruct = {
+    /** 插件本身的配置 */
+    ExtensionConfig: ExtensionConfig;
     /** 要下载的书籍信息 */
     Books: { [bid: string]: OneBookData };
+};
+
+/** 插件自身的配置项 */
+type ExtensionConfig = {
+    /** 只能下载一本书。开启监听时，该值就记录监听的 tabId，取消监听时重置它 */
+    target_tab: number | null;
 };
 
 /** 保存一本书的完整信息 */

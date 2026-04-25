@@ -14,18 +14,6 @@
         "default_popup": "popup/index.html",
         "default_icon": "icons/icon-64.png"
     },
-    "content_scripts": [
-        {
-            "matches": [
-                "https://wqbook.wqxuetang.com/deep/read/epub*",
-                "https://wqbook.wqxuetang.com/deep/read/pdf*"
-            ],
-            "js": [
-                "content/index.js"
-            ],
-            "run_at": "document_start"
-        }
-    ],
     "background": {
         "service_worker": "background/service_worker.js",
         "type": "module"
@@ -39,7 +27,8 @@
         "debugger",
         "storage",
         "unlimitedStorage",
-        "downloads"
+        "downloads",
+        "alarms"
     ],
     "host_permissions": [
         "https://wqbook.wqxuetang.com/deep/read/epub*",

@@ -51,11 +51,6 @@ type BookCatalogNode = {
     children: BookCatalogNode[] | null;
 };
 
-interface ICureWhbyDownloader {
-    /** 保存书籍某一页的内容，如果是二进制内容，则需要 base64 encode 再保存 */
-    save_one_page(page: number, content: string): unknown;
-}
-
 /** 从一些 URL 中可以提取出来的信息 */
 type DataFromEpubUrl = {
     bid?: string;
@@ -88,19 +83,6 @@ type MsgInBgAndPopup = {
         tabId: number;
         mode: ReadMode;
         bid: string;
-    };
-};
-
-/** background 和 content 通信的数据格式 */
-type MsgInBgAndContent = {
-    /**
-     * set-action: 设置自动化操作，即翻页咯
-     */
-    type: "set-auto";
-    data: {
-        /** 不同阅读模式下的翻页逻辑不同 */
-        mode: ReadMode;
-        on: boolean;
     };
 };
 
