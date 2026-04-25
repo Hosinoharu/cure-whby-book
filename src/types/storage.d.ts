@@ -31,10 +31,11 @@ type BookPageStoreItem = {
     filename?: string;
     /** 该页的内容
      * - `type` 为 `img`` 时，它是一个图片的 base64 encode 内容
+     * - `mode` 为 `pdf` 时，保存的是 `PdfSplitImageContent`
      */
-    content: string;
-    /** 存储的内容格式，它也可以存储静态文件哟 */
-    type: ContentKind;
+    content: string | PdfSplitImageContent;
+    /** 存储的内容格式，它也可以存储静态文件哟，只有 epub 才有 */
+    type?: ContentKind;
 };
 
 type OneBookDBConnection = {

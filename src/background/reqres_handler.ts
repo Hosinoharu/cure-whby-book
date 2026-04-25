@@ -290,7 +290,7 @@ async function handle_epub_book_content(
             filename,
         );
 
-    const ok = await CureWhbyBookManager.save_epub_one_page(
+    await CureWhbyBookManager.save_epub_one_page(
         bid,
         page,
         chapter,
@@ -298,19 +298,6 @@ async function handle_epub_book_content(
         content,
         "xhtml",
     );
-
-    !ok &&
-        logger.error(
-            "save_epub_one_page failed",
-            "bid:",
-            bid,
-            ", page:",
-            page,
-            ", chapter:",
-            chapter,
-            ", filename:",
-            filename,
-        );
 }
 
 /** 处理关于 pdf 的内容
@@ -339,6 +326,13 @@ async function handle_pdf_book_content(
 
     if (type === "before-img") {
         await PdfModeOnePageManager.Instance.add_before_img_req_info(
+            bid,
+            page,
+            kvalue,
+            content,
+        );
+    } else {
+        await PdfModeOnePageManager.Instance.add_img_req_info(
             bid,
             page,
             kvalue,
@@ -386,7 +380,7 @@ async function handle_epub_book_assets(
                     filename,
                 );
 
-            const ok = await CureWhbyBookManager.save_epub_one_page(
+            await CureWhbyBookManager.save_epub_one_page(
                 bid,
                 parseInt(page),
                 parseInt(chapter),
@@ -394,19 +388,6 @@ async function handle_epub_book_assets(
                 content,
                 type,
             );
-
-            !ok &&
-                logger.error(
-                    "save_epub_one_page assets failed",
-                    "bid:",
-                    bid,
-                    ", page:",
-                    page,
-                    ", chapter:",
-                    chapter,
-                    ", filename:",
-                    filename,
-                );
         } else {
             logger.error("get epub book assets file failed. url: ", url);
         }

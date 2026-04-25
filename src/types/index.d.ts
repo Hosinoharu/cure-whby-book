@@ -70,8 +70,10 @@ type DataFromPdfUrl = {
     kvalue?: string;
 };
 
+type SplitPageOrder = 1 | 2 | 3 | 4 | 5 | 6;
+
 /** 存储 6 个小图片的类型 */
-type PdfSplitImageContent = Record<1 | 2 | 3 | 4 | 5 | 6, string>;
+type PdfSplitImageContent = Record<SplitPageOrder, string>;
 
 // #region background 和 popup 通信的数据格式
 

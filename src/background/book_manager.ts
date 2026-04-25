@@ -12,11 +12,11 @@ const DEBUG = {
     /** 输出获取到的书籍信息 */
     LOG_BOOK_DATA: true,
     /** 输出获取到的书籍某页的内容 */
-    LOG_BOOK_PAGE_CONTENT: false,
+    LOG_BOOK_PAGE_CONTENT: true,
     /** 在保存一页内容后，输出底层数据库的所有内容，仅用于调试哟 */
     LOG_ALL_BOOK_PAGES: false,
     /** 输出解密 k 值时的日志 */
-    LOG_DECRYPT_K_VALUE: true,
+    LOG_DECRYPT_K_VALUE: false,
 };
 
 /** 管理一本书籍的相关信息，包括下载等等 */
@@ -26,7 +26,7 @@ export abstract class CureWhbyBookManager {
     /** 在提取书籍相关信息时进行简单的存在性校验，如果不存在，则输出 `error` 信息
      * @returns 成功则返回 `book_data` 自身
      */
-    static check_book_data<T>(book_data: T, error: string): T {
+    private static check_book_data<T>(book_data: T, error: string): T {
         book_data === undefined && logger.error("book data error:", error);
         return book_data;
     }
@@ -138,8 +138,6 @@ export abstract class CureWhbyBookManager {
 
     // #endregion
 
-    // #region 关于 epub
-
     /** 存储 epub 一页的内容 */
     static async save_epub_one_page(
         bid: string,
@@ -148,7 +146,7 @@ export abstract class CureWhbyBookManager {
         filename: string,
         content: string,
         type: ContentKind,
-    ): Promise<boolean> {
+    ) {
         // xhtml 的内容是加密的，其它的不需要处理哟
         const new_content =
             type === "xhtml" ? EpubModeHelper.decrypt(content) : content;
@@ -164,25 +162,67 @@ export abstract class CureWhbyBookManager {
                 content,
             );
 
-        const ok = await CureBookPageDB.Instance.save_one_page(
+        const ok = await CureBookPageDB.Instance.save_epub_one_page(
             bid,
-            "epub",
             page,
             new_content,
             chapter,
             filename,
             type,
         );
+
+        !ok &&
+            logger.error(
+                "save_epub_one_page assets failed",
+                "bid:",
+                bid,
+                ", page:",
+                page,
+                ", chapter:",
+                chapter,
+                ", filename:",
+                filename,
+            );
+
         DEBUG.LOG_ALL_BOOK_PAGES &&
             (await CureBookPageDB.Instance.show_all_data(bid));
-        return ok;
     }
 
-    // #endregion
+    /** 存储 pdf 一页的内容 */
+    static async save_pdf_one_page(
+        bid: string,
+        page: number,
+        content: PdfSplitImageContent,
+    ) {
+        DEBUG.LOG_BOOK_PAGE_CONTENT &&
+            logger.log(
+                "pdf page content",
+                "bid:",
+                bid,
+                ", page:",
+                page,
+                ", content:",
+                content,
+            );
 
-    // #region 关于 pdf
+        const ok = await CureBookPageDB.Instance.save_pdf_one_page(
+            bid,
+            page,
+            content,
+        );
 
-    // #endregion
+        !ok &&
+            logger.error(
+                "save_pdf_one_page failed",
+                "bid:",
+                bid,
+                ", page:",
+                page,
+            );
+
+        DEBUG.LOG_ALL_BOOK_PAGES &&
+            (await CureBookPageDB.Instance.show_all_data(bid));
+    }
 }
 
 /** 在流式阅读模式中，辅助获取书籍内容 */
@@ -301,6 +341,18 @@ export class PdfModeOnePageManager {
      * - value: { key: 页码, value: 6 个小图片 }
      */
     private imgs = new Map<string, Record<number, PdfSplitImageContent>>();
+    /** 记录了小图片的映射关系。
+     *
+     * 根据【小图片之前的请求】，可以得到一个 `zn（小图片的顺序） -- new_zn（一个加密值）` 的映射关系。
+     * 根据【小图片的请求】，可以拿到它对应的 `new_zn`，然后通过这个映射关系，得到 `zn`，从而得到小图片的顺序。
+     *
+     * 所以这里临时存储每一页内容（6 张小图片）的 `zn` 和 `new_zn` 的映射关系。
+     * - key 就是【书籍id-页码】
+     * - value 是一个对象，key 是 `new_zn`，value 是 `zn`
+     *
+     * 后续可以通过小图片的【书籍 id、页码、new_zn】来获取 `zn`，从而得到该小图片的顺序。
+     */
+    private zn_map = new Map<string, Record<string, SplitPageOrder>>();
 
     private constructor() {}
 
@@ -311,6 +363,59 @@ export class PdfModeOnePageManager {
         return this.instance;
     }
 
+    // #region handle zn map
+
+    /** 为书籍的小图片添加 zn 与 new_zn 的映射关系 */
+    private add_zn_map(
+        bid: string,
+        page: number,
+        zn: SplitPageOrder,
+        new_zn: string,
+    ) {
+        const key = `${bid}-${page}`;
+        const m = this.zn_map.get(key) || {};
+        m[new_zn] = zn;
+        this.zn_map.set(key, m);
+    }
+
+    /** 根据书籍的小图片的 new_zn 获取对应的 zn */
+    private get_zn(bid: string, page: number, new_zn: string) {
+        const key = `${bid}-${page}`;
+        const m = this.zn_map.get(key) || {};
+        return m[new_zn] as SplitPageOrder | undefined;
+    }
+
+    /** 下载好了书籍的某一页之后，清理资源 */
+    private clear_zn_map(bid: string, page: number) {
+        const key = `${bid}-${page}`;
+        this.zn_map.delete(key);
+    }
+
+    // #endregion
+
+    /** 临时存储书籍某一页的一个小图片，并且指定了顺序哟 */
+    private async add_split_img(
+        bid: string,
+        page: number,
+        order: SplitPageOrder,
+        img: string,
+    ) {
+        const the_book = this.imgs.get(bid) || {};
+        const the_page = the_book[page] || {};
+        the_page[order] = img;
+
+        // 如果已经添加了 6 张小图片，那么就将它们写入数据库，不在此处合并图片啦
+        if (Object.keys(the_page).length === 6) {
+            await CureWhbyBookManager.save_pdf_one_page(bid, page, the_page);
+            this.clear_zn_map(bid, page);
+            delete the_book[page];
+        } else {
+            the_book[page] = the_page;
+        }
+
+        this.imgs.set(bid, the_book);
+    }
+
     /** 添加一个在小图片之前的请求信息 */
     async add_before_img_req_info(
         bid: string,
@@ -319,9 +424,14 @@ export class PdfModeOnePageManager {
         content: string,
     ) {
         const decrypt_k = await decrypt_kvalue(kvalue);
+        if (decrypt_k === undefined) {
+            logger.error("decrypt_kvalue failed, maybe algorithm changed");
+            return;
+        }
+
         DEBUG.LOG_DECRYPT_K_VALUE &&
             logger.log(
-                "decrypt_k",
+                "decrypt_k in before_img_req_info",
                 " bid:",
                 bid,
                 ", page:",
@@ -329,10 +439,67 @@ export class PdfModeOnePageManager {
                 ", decrypt result:",
                 decrypt_k,
             );
+
+        // #cure-tip 解析出用于图片请求的 new_zn
+        try {
+            const zn = decrypt_k["zn"] as string;
+            const ivalue = JSON.parse(decrypt_k["k"])["i"] as string;
+            const key = ivalue.slice(0, 16);
+            const data = JSON.parse(content)["data"];
+            const decrypted_data = CryptoJS.AES.decrypt(
+                data,
+                CryptoJS.enc.Utf8.parse(key),
+                {
+                    mode: CryptoJS.mode.ECB,
+                    padding: CryptoJS.pad.Pkcs7,
+                },
+            );
+            const new_zn = JSON.parse(
+                CryptoJS.enc.Utf8.stringify(decrypted_data),
+            )["zn"];
+
+            this.add_zn_map(bid, page, parseInt(zn) as SplitPageOrder, new_zn);
+        } catch (e) {
+            logger.error("parse zn and new_zn failed", e);
+        }
     }
 
     /** 添加一个小图片的请求信息 */
-    add_img_req_info() {
-        //
+    async add_img_req_info(
+        bid: string,
+        page: number,
+        kvalue: string,
+        content: string,
+    ) {
+        const decrypt_k = await decrypt_kvalue(kvalue);
+        if (decrypt_k === undefined) {
+            logger.error("decrypt_kvalue failed, maybe algorithm changed");
+            return;
+        }
+
+        DEBUG.LOG_DECRYPT_K_VALUE &&
+            logger.log(
+                "decrypt_k in img_req_info",
+                " bid:",
+                bid,
+                ", page:",
+                page,
+                ", decrypt result:",
+                decrypt_k,
+            );
+
+        // #cure-tip 获取小图片的顺序并存储
+        try {
+            const new_zn = JSON.parse(decrypt_k["k"])["zn"];
+            const order = this.get_zn(bid, page, new_zn);
+            if (order === undefined) {
+                logger.error("get_zn failed, maybe algorithm changed");
+                return;
+            }
+
+            await this.add_split_img(bid, page, order, content);
+        } catch (e) {
+            logger.error("parse split image order failed", e);
+        }
     }
 }

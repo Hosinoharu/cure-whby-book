@@ -106,26 +106,23 @@ export default class CureBookPageDB {
 
     // #region save page
 
-    /** 保存书籍一页的内容，不同的阅读下需要的参数不同
+    /** 保存 epub 书籍一页的内容
      * @param bid 书籍的 id
-     * @param mode 该书籍的阅读模式
      * @param page 页数
      * @param content 该页的内容
-     * @param chapter 章节数，仅 epub 需要此参数
-     * @param filename 该页的名字，仅 epub 需要此参数
-     * @param type 实际存储的内容类型，仅 epub 需要此参数
-     *
+     * @param chapter 章节数
+     * @param filename 该页的名字
+     * @param type 实际存储的内容类型
      *
      * @returns 保存成功则返回 true
      */
-    async save_one_page(
+    async save_epub_one_page(
         bid: string,
-        mode: ReadMode,
         page: number,
         content: string,
-        chapter?: number,
-        filename?: string,
-        type?: ContentKind,
+        chapter: number,
+        filename: string,
+        type: ContentKind,
     ): Promise<boolean> {
         try {
             await this.init(bid);
@@ -134,41 +131,41 @@ export default class CureBookPageDB {
             return false;
         }
 
-        if (mode === "pdf") {
-            return await this.save_pdf_one_page(bid, page);
-        } else if (mode === "epub") {
-            if (
-                chapter === undefined ||
-                filename === undefined ||
-                type === undefined
-            ) {
-                logger.error("epub mode need chapter number and filename");
-                return false;
-            }
-
-            const data: BookPageStoreItem = {
-                id: type === "xhtml" ? `${chapter}-${page}` : filename,
-                bid,
-                pid: `${chapter}-${page}`,
-                mode,
-                filename,
-                content,
-                type,
-            };
-            return await this.save_epub_one_page(data);
-        }
-
-        throw new Error(`unknown mode: ${mode}`);
+        const data: BookPageStoreItem = {
+            id: type === "xhtml" ? `${chapter}-${page}` : filename,
+            bid,
+            pid: `${chapter}-${page}`,
+            mode: "epub",
+            filename,
+            content: content as string,
+            type,
+        };
+        return await this.save_one_page_data(data);
     }
 
-    private async save_pdf_one_page(
+    async save_pdf_one_page(
         bid: string,
         page: number,
+        content: PdfSplitImageContent,
     ): Promise<boolean> {
-        throw new Error("Method not implemented.");
+        try {
+            await this.init(bid);
+        } catch (e) {
+            logger.error("init db failed", e);
+            return false;
+        }
+
+        const data: BookPageStoreItem = {
+            id: `${page}`,
+            bid,
+            pid: `${page}`,
+            mode: "pdf",
+            content,
+        };
+        return await this.save_one_page_data(data);
     }
 
-    private async save_epub_one_page(
+    private async save_one_page_data(
         data: BookPageStoreItem,
     ): Promise<boolean> {
         const db = this.get_book_conn(data.bid).db;
