@@ -22,7 +22,8 @@
             ],
             "js": [
                 "content/index.js"
-            ]
+            ],
+            "run_at": "document_start"
         }
     ],
     "background": {

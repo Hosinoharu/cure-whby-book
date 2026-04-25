@@ -27,20 +27,38 @@ let epub_interval = 0;
 /** 翻页需要触发的事件 */
 const epub_right_event = new KeyboardEvent("keyup", {
     // 经过测试，网站是检测 keyCode 触发的翻页
+    // #cure-warn 该属性无法被更改，可能被网站监测是 JS 触发的翻页
+    // isTrusted: true,
+    // #cure-warn 这几个个属性无法添加
+    // sourceElement: document.body,
+    // target: document.body,
+    // sourceCapabilities: { ... },
     key: "ArrowRight",
     code: "ArrowRight",
     keyCode: 39,
     which: 39,
+    bubbles: true,
+    cancelable: true,
+    composed: true,
+    view: window,
 });
 const epub_left_event = new KeyboardEvent("keyup", {
     key: "ArrowLeft",
     code: "ArrowLeft",
     keyCode: 37,
     which: 37,
+    bubbles: true,
+    cancelable: true,
+    composed: true,
+    view: window,
 });
 
 /** pdf 阅读模式下的自动化计时器的 id */
 let pdf_interval = 0;
+/** 每次向下滚动的距离 */
+const scroll_step = 40;
+/** 操作滚动的元素 */
+let target_element: HTMLElement | null = null;
 
 const interval_time = 3000;
 
@@ -71,7 +89,17 @@ async function init_action_in_epub_mode() {
 }
 
 function action_in_pdf_mode(on: boolean) {
-    //
+    if (on) {
+        pdf_interval = setInterval(() => {
+            target_element =
+                target_element ?? document.querySelector("#scroll");
+            if (target_element) {
+                target_element.scrollTop += scroll_step;
+            }
+        }, interval_time) as any;
+    } else {
+        clearInterval(pdf_interval);
+    }
 }
 
 // #endregion
