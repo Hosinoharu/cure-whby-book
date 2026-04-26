@@ -206,7 +206,12 @@ export default class CureBookPageDB {
     // #region get page
 
     /** 获取书籍的所有页内容 */
-    async get_all_pages(bid: string): Promise<BookPageStoreItem[]> {
+    async get_all_pages<T extends ReadMode>(
+        bid: string,
+        mode: T,
+    ): Promise<
+        T extends "epub" ? EpubBookPageStoreItem[] : PdfBookPageStoreItem[]
+    > {
         try {
             await this.init(bid);
         } catch (e) {
@@ -226,7 +231,7 @@ export default class CureBookPageDB {
 
         return new Promise((resolve, reject) => {
             req.onsuccess = () => {
-                resolve(req.result as BookPageStoreItem[]);
+                resolve(req.result.filter((item) => item.mode === mode));
             };
             req.onerror = (e) => {
                 logger.error("get_all_pages failed", e);

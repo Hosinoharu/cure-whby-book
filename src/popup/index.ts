@@ -57,7 +57,10 @@ async function download_book() {
         };
         await chrome.runtime.sendMessage(data);
 
-        const book_pages = await CureBookPageDB.Instance.get_all_pages(bid);
+        const book_pages = await CureBookPageDB.Instance.get_all_pages(
+            bid,
+            "epub",
+        );
         if (book_pages.length > 0) {
             const gen = new CureEpubGenerator(book_data, book_pages);
             gen.pack_and_download();

@@ -45,7 +45,7 @@ export default class CureEpubGenerator {
         /** 书籍的基本信息 */
         private book_data: OneBookData,
         /** 书籍的每一页内容 */
-        private book_pages: BookPageStoreItem[],
+        private book_pages: EpubBookPageStoreItem[],
     ) {
         this.zip = new JSZip();
     }

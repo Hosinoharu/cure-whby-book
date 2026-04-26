@@ -19,8 +19,7 @@ type OneBookData = OneBookSimpleData & {
     downloaded_pages?: number[];
 };
 
-/** 存储书籍内容到数据库中时，表示一项数据（也就是一页的内容） */
-type BookPageStoreItem = {
+type BaseBookPageStoreItem = {
     /** 它作为每一页的唯一 id，其构成为
      * - 当保存为 xhtml 时，其构成为 `${chapter 章节编号}-${page 页码}`，这才是唯一的！
      * - 当保存为 css、img 时，它本身就是唯一的，所以使用文件名 `${filename}`
@@ -35,16 +34,28 @@ type BookPageStoreItem = {
     pid: string;
     /** 表示存储的是该阅读模式下的页面 */
     mode: ReadMode;
+};
+
+type EpubBookPageStoreItem = BaseBookPageStoreItem & {
+    mode: "epub";
     /** 该页的名称，只有 epub 才有 */
-    filename?: string;
+    filename: string;
     /** 该页的内容
      * - `type` 为 `img`` 时，它是一个图片的 base64 encode 内容
-     * - `mode` 为 `pdf` 时，保存的是 `PdfSplitImageContent`
      */
-    content: string | PdfSplitImageContent;
+    content: string;
     /** 存储的内容格式，它也可以存储静态文件哟，只有 epub 才有 */
-    type?: ContentKind;
+    type: ContentKind;
 };
+
+type PdfBookPageStoreItem = BaseBookPageStoreItem & {
+    mode: "pdf";
+    /** 该页的内容，保存的是 `PdfSplitImageContent` */
+    content: PdfSplitImageContent;
+};
+
+/** 存储书籍内容到数据库中时，表示一项数据（也就是一页的内容） */
+type BookPageStoreItem = EpubBookPageStoreItem | PdfBookPageStoreItem;
 
 type OneBookDBConnection = {
     bid: string;
