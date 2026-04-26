@@ -327,11 +327,6 @@ abstract class EpubModeHelper {
     }
 }
 
-/** 在原貌阅读模式中，辅助获取书籍内容 */
-abstract class PdfModeHelper {
-    //
-}
-
 /** pdf 中的一页被拆分了 6 个小图片，需要统一管理它们  —— 单例模式 */
 export class PdfModeOnePageManager {
     private static instance?: PdfModeOnePageManager;
@@ -372,6 +367,10 @@ export class PdfModeOnePageManager {
         zn: SplitPageOrder,
         new_zn: string,
     ) {
+        if (zn < 0 || zn > 5) {
+            logger.error("zn value is valid, maybe algorithm changed", zn);
+        }
+
         const key = `${bid}-${page}`;
         const m = this.zn_map.get(key) || {};
         m[new_zn] = zn;

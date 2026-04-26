@@ -3,6 +3,7 @@ import { BookStorageHelper } from "@/share/storage";
 import CureEpubGenerator from "./epub_generator";
 import CureLogger from "@/share/logger";
 import { get_data_from_read_page } from "@/share/target_api";
+import CurePdfGenerator from "./pdf_generator";
 
 const logger = new CureLogger("popup");
 
@@ -59,11 +60,25 @@ async function download_book() {
 
         const book_pages = await CureBookPageDB.Instance.get_all_pages(
             bid,
-            "epub",
+            mode,
         );
-        if (book_pages.length > 0) {
-            const gen = new CureEpubGenerator(book_data, book_pages);
+        if (book_pages.length === 0) {
+            logger.warn("no book pages found", "book name:", book_data.name);
+            return;
+        }
+
+        if (mode === "epub") {
+            const gen = new CureEpubGenerator(
+                book_data,
+                book_pages as EpubBookPageStoreItem[],
+            );
             gen.pack_and_download();
+        } else {
+            const gen = new CurePdfGenerator(
+                book_data,
+                book_pages as PdfBookPageStoreItem[],
+            );
+            gen.test_download_one_img();
         }
     }
 }

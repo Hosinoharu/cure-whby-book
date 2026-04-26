@@ -65,7 +65,7 @@ type DataFromPdfUrl = {
     kvalue?: string;
 };
 
-type SplitPageOrder = 1 | 2 | 3 | 4 | 5 | 6;
+type SplitPageOrder = 0 | 1 | 2 | 3 | 4 | 5;
 
 /** 存储 6 个小图片的类型 */
 type PdfSplitImageContent = Record<SplitPageOrder, string>;
