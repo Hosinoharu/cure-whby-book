@@ -1,12 +1,17 @@
 /** 生成 pdf 文件 */
 
 import CureLogger from "@/share/logger";
+import jsPDF from "jspdf";
 
 const logger = new CureLogger("popup/pdf_generator");
 
 export default class CurePdfGenerator {
     private readonly canvas: HTMLCanvasElement;
     private readonly ctx: CanvasRenderingContext2D;
+
+    private readonly pdf: jsPDF;
+    private readonly pagee_width: number;
+    private readonly page_height: number;
 
     constructor(
         /** 书籍的基本信息 */
@@ -20,11 +25,15 @@ export default class CurePdfGenerator {
             throw new Error("canvas context is null");
         }
         this.ctx = ctx;
+        // 默认是 a4 大小
+        this.pdf = new jsPDF({ format: "a4" });
+        this.pagee_width = this.pdf.internal.pageSize.getWidth();
+        this.page_height = this.pdf.internal.pageSize.getHeight();
     }
 
     // #region 单张图片的处理
 
-    /** 合并小图片为大图片，返回对应图片的 base64 encode 内容 */
+    /** 合并小图片为大图片，并压缩成 jpeg 返回二进制内容 */
     private async merge_split_imgs(content: PdfSplitImageContent) {
         const imgs = await Promise.all(
             [
@@ -46,13 +55,23 @@ export default class CurePdfGenerator {
         this.canvas.width = width;
         this.canvas.height = height;
 
+        // #cure-warn 调整图片的旋转并摆正
+        // 根据顺序合并出来的是旋转 180 度的图片哟
+        // 所以要调整绘制的过程，让最终成型的图片方向正确
         let x = 0;
-        for (const img of imgs) {
-            this.ctx.drawImage(img, x, 0);
+        for (const img of imgs.reverse()) {
+            this.ctx.save();
+            // 定位到要绘制的图片的位置中心，旋转、并绘制
+            this.ctx.translate(x + img.width / 2, height / 2);
+            this.ctx.rotate(Math.PI);
+            this.ctx.drawImage(img, -img.width / 2, -img.height / 2);
+            this.ctx.restore();
             x += img.width;
         }
 
-        return this.canvas.toDataURL("image/png");
+        // #cure-warn 调整图片质量
+        // 原本一张 png 图片 1mb 大小，300 多页的书籍那还得了
+        return this.canvas.toDataURL("image/jpeg", 0.5);
     }
 
     /** 将字符串形式的图片转为 Image 对象 */
@@ -65,13 +84,23 @@ export default class CurePdfGenerator {
         });
     }
 
-    /** 测试，仅下载书籍的一张图片 */
-    async test_download_one_img() {
+    /** 测试，仅下载书籍的一张图片并打包成 PDF */
+    async test_download_one_img_to_pdf() {
         const img = await this.merge_split_imgs(this.book_pages[0].content);
-        const a = document.createElement("a");
-        a.href = img;
-        a.download = "test.png";
-        a.click();
+        this.pdf.addImage(
+            img,
+            "JPEG",
+            0,
+            0,
+            // 填充整个页面
+            this.pagee_width,
+            this.page_height,
+        );
+        const url = this.pdf.output("bloburl");
+        await chrome.downloads.download({
+            url: url.toString(),
+            filename: `${this.book_data.name}.pdf`,
+        });
     }
 
     // #endregion

@@ -11,7 +11,7 @@ const logger = new CureLogger("bg/index");
 logger.log("Cure Cure ~\\(≧▽≦)/~");
 
 // #cure-test 测试时应该保留下载的内容，方便后续快速测试 epub、pdf 的生成
-if (__IS_DEV__) {
+if (!__IS_DEV__) {
     // 安装插件时删除清空建数据库
     chrome.runtime.onInstalled.addListener(() => {
         CureBookPageDB.Instance.remove_all();
