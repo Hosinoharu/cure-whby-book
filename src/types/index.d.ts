@@ -1,5 +1,7 @@
 /// <reference types="devtools-protocol" />
 
+declare const __IS_DEV__: boolean;
+
 /** 对应网站中读书的阅读模式
  * - pdf: 原貌模式
  * - epub: 流式模式

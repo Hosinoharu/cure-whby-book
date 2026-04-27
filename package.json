@@ -6,7 +6,8 @@
   "license": "MIT",
   "type": "module",
   "scripts": {
-    "build": "vite build"
+    "build": "vite build",
+    "build-dev": "vite build --mode dev"
   },
   "dependencies": {
     "crypto-js": "^4.2.0",

@@ -4,8 +4,11 @@ import { defineConfig } from "vite";
 
 const outDir = path.resolve(__dirname, "dist");
 
-export default defineConfig({
+export default defineConfig(({ mode }) => ({
     root: "./src",
+    define: {
+        __IS_DEV__: mode === "dev",
+    },
     plugins: [
         vite_plugin_copy_files(outDir, [
             {
@@ -49,7 +52,7 @@ export default defineConfig({
             "@": path.resolve(__dirname, "src"),
         },
     },
-});
+}));
 
 // #region vite plugin copy files
 
