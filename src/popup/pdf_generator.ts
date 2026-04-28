@@ -55,8 +55,9 @@ export default class CurePdfGenerator {
         this.canvas.width = width;
         this.canvas.height = height;
 
-        // #cure-warn 调整图片的旋转并摆正
+        // #cure-warn-todo 调整图片的旋转并摆正
         // 根据顺序合并出来的是旋转 180 度的图片哟
+        // 不太确定，有些图片只旋转了 90 度，旋转角度也许可以从哪里得知
         // 所以要调整绘制的过程，让最终成型的图片方向正确
         let x = 0;
         for (const img of imgs.reverse()) {
@@ -104,4 +105,31 @@ export default class CurePdfGenerator {
     }
 
     // #endregion
+
+    async pack_and_download() {
+        for (let i = 0; i < this.book_pages.length; i++) {
+            const page = this.book_pages[i];
+            const img = await this.merge_split_imgs(page.content);
+            this.pdf.addImage(
+                img,
+                "JPEG",
+                0,
+                0,
+                // 填充整个页面
+                this.pagee_width,
+                this.page_height,
+            );
+            i < this.book_pages.length - 2 && this.pdf.addPage();
+        }
+
+        const url = this.pdf.output("bloburl");
+        const filename = `${this.book_data.name}(${this.book_data.author}).pdf`;
+        chrome.downloads.download({
+            url: url.toString(),
+            filename: __IS_DEV__ ? "test.pdf" : filename,
+            // 测试的时候直接覆盖下载的文件
+            conflictAction: __IS_DEV__ ? "overwrite" : undefined,
+            saveAs: !__IS_DEV__,
+        });
+    }
 }

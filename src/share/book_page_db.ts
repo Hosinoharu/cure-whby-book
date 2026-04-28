@@ -158,7 +158,7 @@ export default class CureBookPageDB {
         const data: BookPageStoreItem = {
             id: `${page}`,
             bid,
-            pid: `${page}`,
+            pid: page,
             mode: "pdf",
             content,
         };
@@ -231,7 +231,14 @@ export default class CureBookPageDB {
 
         return new Promise((resolve, reject) => {
             req.onsuccess = () => {
-                resolve(req.result.filter((item) => item.mode === mode));
+                const res = req.result.filter((item) => item.mode === mode);
+                // #cure-tip 获取 PDF 页面时需要按照页码排序
+                if (mode === "pdf") {
+                    (res as PdfBookPageStoreItem[]).sort(
+                        (a, b) => (a.pid as number) - (b.pid as number),
+                    );
+                }
+                resolve(res);
             };
             req.onerror = (e) => {
                 logger.error("get_all_pages failed", e);

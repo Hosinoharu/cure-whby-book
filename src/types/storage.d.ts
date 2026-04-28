@@ -23,6 +23,7 @@ type BaseBookPageStoreItem = {
     /** 它作为每一页的唯一 id，其构成为
      * - 当保存为 xhtml 时，其构成为 `${chapter 章节编号}-${page 页码}`，这才是唯一的！
      * - 当保存为 css、img 时，它本身就是唯一的，所以使用文件名 `${filename}`
+     * - 当保存为 pdf 时，它就是页码！
      */
     id: `${number}-${number}` | string;
     /** 书籍的 id，表示该页属于哪本书籍 */
@@ -31,7 +32,7 @@ type BaseBookPageStoreItem = {
      * - 对于 pdf 文件，是页码
      * - 对于 epub 文件，是`章节的 id + 页码`，例如 `1-1`
      */
-    pid: string;
+    pid: string | number;
     /** 表示存储的是该阅读模式下的页面 */
     mode: ReadMode;
 };
