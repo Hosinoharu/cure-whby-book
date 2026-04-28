@@ -55,10 +55,13 @@ export default class CurePdfGenerator {
         this.canvas.width = width;
         this.canvas.height = height;
 
-        // #cure-warn-todo 调整图片的旋转并摆正
-        // 根据顺序合并出来的是旋转 180 度的图片哟
-        // 不太确定，有些图片只旋转了 90 度，旋转角度也许可以从哪里得知
-        // 所以要调整绘制的过程，让最终成型的图片方向正确
+        // #cure-warn 调整图片的旋转并摆正
+        // 根据顺序合并出来的图片是旋转后的，所以要调整绘制的过程，让最终成型的图片方向正确
+        // 有些图片只向右旋转了 90 度、或者旋转了 180 度
+        // 暂时不清楚如何从请求中找到规律
+        // 从图片大小来说，旋转 180 度之后，图片的高还是原来的高，有 2000 多
+        // 旋转 90 度之后，图片的高是原来的宽，只有 1400 多
+        // 倒是可以基于此来判断旋转图片多少度，感觉不可靠
         let x = 0;
         for (const img of imgs.reverse()) {
             this.ctx.save();
@@ -124,7 +127,7 @@ export default class CurePdfGenerator {
 
         const url = this.pdf.output("bloburl");
         const filename = `${this.book_data.name}(${this.book_data.author}).pdf`;
-        chrome.downloads.download({
+        const downloadId = await chrome.downloads.download({
             url: url.toString(),
             filename: __IS_DEV__ ? "test.pdf" : filename,
             // 测试的时候直接覆盖下载的文件

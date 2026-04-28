@@ -473,7 +473,7 @@ const r_instance = new R();
 let initializing = false;
 let intialized = false;
 
-/** 该值是浏览器的指纹，似乎还随时间变动，因为之前取的值已经实现了。
+/** 该值是浏览器的指纹，似乎还随时间变动，因为之前取的值已经失效了。
  *
  * 但网站计算出来后会将其写入到 `cookie` 的 `gidf` 字段中，所以直接使用该值即可。
  */
