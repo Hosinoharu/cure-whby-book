@@ -28,10 +28,12 @@
         "storage",
         "unlimitedStorage",
         "downloads",
-        "alarms"
+        "alarms",
+        "cookies"
     ],
     "host_permissions": [
-        "https://wqbook.wqxuetang.com/deep/read/epub*",
-        "https://wqbook.wqxuetang.com/deep/read/pdf*"
+        "*://wqbook.wqxuetang.com/",
+        "*://wqbook.wqxuetang.com/deep/read/epub*",
+        "*://wqbook.wqxuetang.com/deep/read/pdf*"
     ]
 }
