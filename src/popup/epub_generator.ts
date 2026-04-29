@@ -143,8 +143,8 @@ ${tag_spine}
 
         // 先排序 xhtml，这样后面写入 spine 标签等操作时可以直接写入
         this.book_pages.sort((a, b) => {
-            const [a1, a2] = a.pid.split("-");
-            const [b1, b2] = b.pid.split("-");
+            const [a1, a2] = (a.pid as string).split("-");
+            const [b1, b2] = (b.pid as string).split("-");
             return parseInt(a1) - parseInt(b1) || parseInt(a2) - parseInt(b2);
         });
         // 放在这里就只需要遍历一次，完成了两件事：写入和创建 item
