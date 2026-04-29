@@ -78,9 +78,7 @@ async function download_book() {
                 book_data,
                 book_pages as PdfBookPageStoreItem[],
             );
-            __IS_DEV__
-                ? gen.test_download_one_img_to_pdf()
-                : gen.pack_and_download();
+            gen.pack_and_download();
         }
     }
 }

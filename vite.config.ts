@@ -40,6 +40,15 @@ export default defineConfig(({ mode }) => ({
                     }
                     return prefix + "[name].js";
                 },
+                manualChunks(id) {
+                    if (id.includes("node_modules")) {
+                        const name = id
+                            .toString()
+                            .split("node_modules/")[1]
+                            ?.split("/")[0];
+                        return "lib/" + (name || "vendor");
+                    }
+                },
                 chunkFileNames: "[name].js",
                 assetFileNames: "[name].[ext]",
             },

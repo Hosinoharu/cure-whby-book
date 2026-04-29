@@ -46,31 +46,42 @@ export default class CurePdfGenerator {
             ].map((s) => this.base64_str_to_img(s)),
         );
 
-        // 计算最终合并的图片尺寸。注意拿到的图片是被竖着拼接的
-        // 所以高度相同，宽度为所有图片宽度的和
-        const height = imgs[0].height;
-        const width = imgs.reduce((prev, cur) => prev + cur.width, 0);
-
-        // 利用 canvas 合并图片
+        // 计算最终合并的图片尺寸，高度相同，宽度为所有图片宽度的和
+        const temp_height = imgs[0].height;
+        const temp_width = imgs.reduce((prev, cur) => prev + cur.width, 0);
+        const is_rorate_180 = temp_height > temp_width;
+        const width = is_rorate_180 ? temp_width : temp_height;
+        const height = is_rorate_180 ? temp_height : temp_width;
         this.canvas.width = width;
         this.canvas.height = height;
 
         // #cure-warn 调整图片的旋转并摆正
         // 根据顺序合并出来的图片是旋转后的，所以要调整绘制的过程，让最终成型的图片方向正确
-        // 有些图片只向右旋转了 90 度、或者旋转了 180 度
-        // 暂时不清楚如何从请求中找到规律
-        // 从图片大小来说，旋转 180 度之后，图片的高还是原来的高，有 2000 多
-        // 旋转 90 度之后，图片的高是原来的宽，只有 1400 多
-        // 倒是可以基于此来判断旋转图片多少度，感觉不可靠
+        // 具体分析见 `doc/analysis.md` 文档
+
+        const angle = is_rorate_180 ? Math.PI : -Math.PI / 2;
+        /** 每次在 canvas 绘制图片时，从该 x、y 坐标开始计算 */
         let x = 0;
+        let y = 0;
         for (const img of imgs.reverse()) {
             this.ctx.save();
-            // 定位到要绘制的图片的位置中心，旋转、并绘制
-            this.ctx.translate(x + img.width / 2, height / 2);
-            this.ctx.rotate(Math.PI);
+            // 在 canvas 中定位到要绘制的图片的位置中心
+            const point_x = is_rorate_180
+                ? x + img.width / 2
+                : x + img.height / 2;
+            const point_y = is_rorate_180
+                ? y + img.height / 2
+                : y + img.width / 2;
+            this.ctx.translate(point_x, point_y);
+            this.ctx.rotate(angle);
             this.ctx.drawImage(img, -img.width / 2, -img.height / 2);
             this.ctx.restore();
-            x += img.width;
+
+            if (is_rorate_180) {
+                x += img.width;
+            } else {
+                y += img.width;
+            }
         }
 
         // #cure-warn 调整图片质量
@@ -103,7 +114,7 @@ export default class CurePdfGenerator {
         const url = this.pdf.output("bloburl");
         await chrome.downloads.download({
             url: url.toString(),
-            filename: `${this.book_data.name}.pdf`,
+            filename: "test.pdf",
         });
     }
 
