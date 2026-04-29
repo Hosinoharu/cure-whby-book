@@ -1,19 +1,52 @@
 <template>
-    <h1>Cure Whby Book</h1>
+    <main>
+        <header>
+            <h1>Cure Whby Book</h1>
+        </header>
 
-    <section class="btns">
-        <button type="button" @click="start">开始</button>
-        <button type="button" @click="download_book">下载</button>
-        <button type="button" @click="">更新</button>
-        <button type="button" @click="">清空缓存</button>
-    </section>
+        <section class="btns">
+            <button type="button" @click="start">开始</button>
+            <button type="button" @click="download_book">下载</button>
+            <button type="button" @click="">更新</button>
+            <button type="button" @click="">清空缓存</button>
+        </section>
 
-    <section class="book-info">
-        <div class="item">
-            <span class="label">书名：</span>
-            <span class="value">书名</span>
-        </div>
-    </section>
+        <section class="book-info">
+            <div class="item">
+                <span class="label">书名</span>
+                <span class="value" id="book-name">从零开始的魔法少女生活</span>
+            </div>
+            <div class="item">
+                <span class="label">作者</span>
+                <span class="value">Hosinoharu</span>
+            </div>
+            <div class="item">
+                <span class="label">BID</span>
+                <span class="value">2026</span>
+            </div>
+            <div class="item">
+                <span class="label">格式</span>
+                <span class="value">PDF</span>
+            </div>
+            <div class="item">
+                <span class="label">页数</span>
+                <span class="value">300</span>
+            </div>
+            <div class="item">
+                <span class="label">ISBN</span>
+                <span class="value">1234567890</span>
+            </div>
+            <div class="item">
+                <span class="label">版权</span>
+                <span class="value">魔法城堡图书管理部</span>
+            </div>
+            <div class="item">
+                <span class="label">出版</span>
+                <span class="value">2026-04-30</span>
+            </div>
+
+        </section>
+    </main>
 </template>
 
 <script setup lang="ts">
@@ -120,18 +153,104 @@ async function get_tab_info() {
 }
 
 body {
-    background-color: #333;
-    color: #ccc;
-
+    --bg-color: #333;
+    --light-bg-color: #444;
+    --font-color: #ccc;
+    --border-color: #4C4D4F;
     --cure-answer: #C576FF;
     --cure-mystique: #FE6998;
     --cure-eclair: #40B9E1;
     --cure-arcana-shadow: #5C438A;
+
+    --font-size: .6em;
+
+    background-color: var(--bg-color);
+    color: var(--font-color);
 }
 </style>
 
 <style scoped>
-h1 {
+main {
+    width: 400px;
+    height: 500px;
+    border: 1px solid green;
+    padding: 10px 20px;
+
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 10px;
+}
+
+section {
+    width: 100%;
+}
+
+
+header {
     color: var(--cure-mystique);
+    user-select: none;
+}
+
+.btns {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 10px;
+    margin-bottom: 10px;
+}
+
+.btns button {
+    color: var(--font-color);
+    background-color: var(--light-bg-color);
+    border: 2px solid var(--border-color);
+    padding: 5px 15px;
+    border-radius: 10px;
+
+    cursor: pointer;
+}
+
+.btns button:hover {
+    color: var(--cure-answer);
+    border-color: var(--cure-answer);
+}
+
+.book-info {
+    display: flex;
+    flex-direction: column;
+    gap: 5px;
+    font-size: var(--font-size);
+}
+
+.book-info .item {
+    display: flex;
+    align-items: center;
+}
+
+.book-info span {
+    display: block;
+    padding: 3px 10px;
+    border: 1px solid var(--border-color);
+}
+
+.book-info .label {
+    background-color: var(--light-bg-color);
+    width: 10%;
+    text-align: right;
+
+    border-right: none;
+    border-top-left-radius: 5px;
+    border-bottom-left-radius: 5px;
+}
+
+.book-info .value {
+    flex-grow: 1;
+    border-top-right-radius: 5px;
+    border-bottom-right-radius: 5px;
+}
+
+#book-name {
+    color: var(--cure-eclair);
+    font-weight: bold;
 }
 </style>

@@ -1,6 +1,7 @@
 import fs from "fs";
 import path from "path";
 import { defineConfig } from "vite";
+import vue from "@vitejs/plugin-vue";
 
 const outDir = path.resolve(__dirname, "dist");
 
@@ -8,8 +9,10 @@ export default defineConfig(({ mode }) => ({
     root: "./src",
     define: {
         __IS_DEV__: mode === "dev",
+        __IS_DEV_UI__: false,
     },
     plugins: [
+        vue(),
         vite_plugin_copy_files(outDir, [
             {
                 from: path.resolve(__dirname, "manifest.json"),
