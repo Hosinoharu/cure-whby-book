@@ -1,16 +1,12 @@
 /** 管理书籍的下载等操作 */
 
-import { BookStorageHelper } from "@/share/storage";
 import CureLogger from "@/share/logger";
 import CryptoJS from "crypto-js";
 import CureBookPageDB from "@/share/book_page_db";
-import { BOOK_HOST, BOOK_SIMPLE_DATA, BOOK_CATALOG } from "@/share/target_api";
 import decrypt_kvalue from "./decrypt_kvalue";
 
 const logger = new CureLogger("bg/book_manager");
 const DEBUG = {
-    /** 输出获取到的书籍信息 */
-    LOG_BOOK_DATA: true,
     /** 输出获取到的书籍某页的内容 */
     LOG_BOOK_PAGE_CONTENT: false,
     /** 在保存一页内容后，输出底层数据库的所有内容，仅用于调试哟 */
@@ -21,119 +17,6 @@ const DEBUG = {
 
 /** 管理一本书籍的相关信息，包括下载等等 */
 export abstract class CureWhbyBookManager {
-    // #region 通用的方法
-
-    /** 在提取书籍相关信息时进行简单的存在性校验，如果不存在，则输出 `error` 信息
-     * @returns 成功则返回 `book_data` 自身
-     */
-    private static check_book_data<T>(book_data: T, error: string): T {
-        book_data === undefined && logger.error("book data error:", error);
-        return book_data;
-    }
-
-    /** 获取书籍的基础数据并保存，成功则返回 true */
-    static async save_book_simple_data(bid: string): Promise<boolean> {
-        const url = BOOK_SIMPLE_DATA + bid;
-        const response = await fetch(url, {
-            headers: {
-                referer: `${BOOK_HOST}/book/${bid}`,
-            },
-        });
-        const res = await response.json();
-
-        if (this.check_book_data(res.code, "response code is null") !== 0) {
-            return false;
-        }
-
-        // #cure-warn 该 raw_data 的格式根据实际响应而定
-        const raw_data = this.check_book_data(
-            res.data,
-            "response book data is null",
-        );
-
-        const book_data: OneBookData = {
-            bid,
-            name: this.check_book_data(raw_data.name, "book name is null"),
-            author: this.check_book_data(
-                raw_data.author,
-                "book author is null",
-            ),
-            pages: this.check_book_data(raw_data.pages, "book pages is null"),
-            date: this.check_book_data(raw_data.date, "book date is null"),
-            isbn: this.check_book_data(raw_data.isbn, "book isbn is null"),
-            pub: this.check_book_data(raw_data.pub, "book pub is null"),
-            catalog: await this.get_book_catalog(bid),
-        };
-
-        DEBUG.LOG_BOOK_DATA &&
-            logger.log(
-                "get book data",
-                "bid:",
-                bid,
-                ", name:",
-                book_data.name,
-                ", author:",
-                book_data.author,
-                ", pages:",
-                book_data.pages,
-            );
-
-        await BookStorageHelper.add_book_data(book_data);
-        return true;
-    }
-
-    /** 获取书籍的目录数据 */
-    private static async get_book_catalog(
-        bid: string,
-    ): Promise<BookCatalogNode[]> {
-        const url = BOOK_CATALOG + bid;
-        const response = await fetch(url, {
-            headers: {
-                referer: `${BOOK_HOST}/book/${bid}`,
-            },
-        });
-        const res = await response.json();
-
-        if (this.check_book_data(res.code, "response code is null") !== 0) {
-            return [];
-        }
-
-        return this.format_catalog(
-            this.check_book_data(res.data, "response book data is null"),
-        );
-    }
-
-    /** 统一将将书签格式化
-     * 不同阅读模式下的目录略微不同，部分键名的确相同，但值的类型不同，可能是字符串也可能是数字
-     * 所以下面会统一转换
-     */
-    private static format_catalog(nodes: any[]): BookCatalogNode[] {
-        const result: BookCatalogNode[] = [];
-
-        // #cure-warn 该 node 的格式根据实际响应而定
-        for (const node of nodes) {
-            const item: BookCatalogNode = {
-                id: this.check_book_data(node.id, "node id is null"),
-                pid: this.check_book_data(node.pid, "node pid is null"),
-                label: this.check_book_data(node.label, "node label is null"),
-                level: this.check_book_data(node.level, "node level is null"),
-                pnum: this.check_book_data(node.pnum, "node pnum is null"),
-                isLeaf: this.check_book_data(
-                    node.isLeaf,
-                    "node isLeaf is null",
-                ),
-                children: node.children
-                    ? this.format_catalog(node.children)
-                    : null,
-            };
-            result.push(item);
-        }
-
-        return result;
-    }
-
-    // #endregion
-
     /** 存储 epub 一页的内容 */
     static async save_epub_one_page(
         bid: string,

@@ -7,8 +7,8 @@
         <section class="btns">
             <button type="button" @click="start">开始</button>
             <button type="button" @click="download_book">下载</button>
-            <button type="button" @click="">更新</button>
-            <button type="button" @click="">清空缓存</button>
+            <button type="button" @click="update_book_info(true)">更新</button>
+            <button type="button" @click="clear_book_data">清空缓存</button>
         </section>
 
         <section v-if="book_info" class="book-info">
@@ -44,7 +44,6 @@
                 <span class="label">出版</span>
                 <span class="value">{{ book_info.date }}</span>
             </div>
-
         </section>
         <section v-else class="no-book-info">
             <h2>
@@ -64,13 +63,13 @@ import CureLogger from "@/share/logger";
 import { get_data_from_read_page } from "@/share/target_api";
 import CurePdfGenerator from "./pdf_generator";
 import { onMounted, ref } from "vue";
+import { save_book_simple_data } from "@/share/request_api";
 
 const logger = new CureLogger("popup");
 
 const book_info = ref<OneBookData | undefined>();
 const read_mode = ref<ReadMode | undefined>();
-const tab_info = ref<{ tabId: number, url: string } | undefined>();
-
+const tab_info = ref<{ tabId: number; url: string } | undefined>();
 
 /** 开启响应拦截 */
 async function start() {
@@ -157,32 +156,13 @@ async function get_tab_info() {
     };
 }
 
-async function get_book_info(bid: string): Promise<OneBookData | undefined> {
+/** 重新获取书籍的信息
+ * @param force 是否强制重新获取，否则仅仅是从 storage 中更新
+ */
+async function update_book_info(force = false) {
     if (__IS_DEV_UI__) {
-        return {
-            name: "从零开始的魔法少女生活",
-            author: "Hosinoharu",
-            bid: "2026",
-            pages: 300,
-            isbn: "1234567890",
-            pub: "魔法城堡图书管理部",
-            date: "2026-04-30",
-        }
-    }
-
-    let book_data = await BookStorageHelper.get_book_data(bid);
-    if (!book_data) {
-
-    }
-
-    return book_data;
-}
-
-
-onMounted(async () => {
-    if (__IS_DEV_UI__) {
-        read_mode.value = "pdf"
-        book_info.value = await get_book_info("dev mode");
+        read_mode.value = "pdf";
+        book_info.value = await get_book_info("dev mode", false);
         return;
     }
 
@@ -203,9 +183,49 @@ onMounted(async () => {
     read_mode.value = book_data.mode;
 
     // #cure-init book info
-    book_info.value = await get_book_info(book_data.bid);
-});
+    book_info.value = await get_book_info(book_data.bid, force);
+}
 
+/** 清空书籍所有的信息，包括下载的消息哟 */
+async function clear_book_data() {
+    if (__IS_DEV_UI__ || !book_info.value) return;
+
+    const bid = book_info.value.bid;
+    await BookStorageHelper.remove_book_data(bid);
+    await CureBookPageDB.Instance.remove(bid);
+}
+
+/** 从 storage 或者 web 获取书籍信息
+ * @param from_web 指定是否访问 web 获取最新的书籍信息
+ * - 如果为 false，会先访问 storage，如果没有找到，才会访问 web
+ */
+async function get_book_info(
+    bid: string,
+    from_web: boolean,
+): Promise<OneBookData | undefined> {
+    if (__IS_DEV_UI__) {
+        return {
+            name: "从零开始的魔法少女生活",
+            author: "Hosinoharu",
+            bid: "2026",
+            pages: 300,
+            isbn: "1234567890",
+            pub: "魔法城堡图书管理部",
+            date: "2026-04-30",
+        };
+    }
+
+    const book_data = from_web
+        ? await save_book_simple_data(bid)
+        : (await BookStorageHelper.get_book_data(bid)) ||
+          (await save_book_simple_data(bid));
+
+    return book_data;
+}
+
+onMounted(async () => {
+    await update_book_info();
+});
 </script>
 
 <style>
@@ -223,14 +243,14 @@ html {
 }
 
 body {
-    --bg-color: #333;
-    --light-bg-color: #444;
+    --bg-color: #222;
+    --light-bg-color: #333;
     --font-color: #ccc;
-    --border-color: #4C4D4F;
-    --cure-answer: #C576FF;
-    --cure-mystique: #FE6998;
-    --cure-eclair: #40B9E1;
-    --cure-arcana-shadow: #5C438A;
+    --border-color: #4c4d4f;
+    --cure-answer: #c576ff;
+    --cure-mystique: #fe6998;
+    --cure-eclair: #40b9e1;
+    --cure-arcana-shadow: #5c438a;
 
     --font-size: 1rem;
 
@@ -243,7 +263,7 @@ body {
 
 <style scoped>
 main {
-    border: 1px solid green;
+    /* border: 1px solid green; */
     padding: 10px 20px;
     display: flex;
     flex-direction: column;
@@ -254,7 +274,6 @@ main {
 section {
     width: 100%;
 }
-
 
 header {
     color: var(--cure-mystique);

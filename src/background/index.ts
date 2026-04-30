@@ -3,7 +3,6 @@ import "./reqres_handler";
 import CureLogger from "@/share/logger";
 import { get_data_from_read_page } from "@/share/target_api";
 import { start_debugger, stop_debugger } from "./reqres_handler";
-import { CureWhbyBookManager } from "./book_manager";
 import { start_auto_action, stop_auto_action } from "./auto_action";
 import { ExtensionConfigHelper } from "@/share/storage";
 
@@ -117,17 +116,13 @@ chrome.runtime.onMessage.addListener(
             case "start-debugger":
                 sendResponse();
                 const { tabId, bid } = request.data;
-                if (await CureWhbyBookManager.save_book_simple_data(bid)) {
-                    await start_debugger(tabId);
-                    await set_extension_downloading_status(tabId, true);
-                    await ExtensionConfigHelper.set_target_tab(tabId);
+                await start_debugger(tabId);
+                await set_extension_downloading_status(tabId, true);
+                await ExtensionConfigHelper.set_target_tab(tabId);
 
-                    // #cure-tip 开启监听之后，立即创建数据库，并开启页面自动化翻页
-                    await CureBookPageDB.Instance.init(bid);
-                    await start_auto_action(tabId);
-                } else {
-                    logger.error("save book simple data error");
-                }
+                // #cure-tip 开启监听之后，立即创建数据库，并开启页面自动化翻页
+                await CureBookPageDB.Instance.init(bid);
+                await start_auto_action(tabId);
                 break;
             case "start-pack":
                 // #cure-tip 取消监听时需要第一时间断开数据库连接啦

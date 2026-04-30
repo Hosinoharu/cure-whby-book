@@ -63,7 +63,7 @@ export default class CureBookPageDB {
         conn.initialized = true;
 
         return new Promise<void>((resolve, reject) => {
-            const db_name = `${self.db_name_prefix}-${bid}`;
+            const db_name = self.gen_db_name(bid);
             const req = indexedDB.open(db_name, 1);
             req.onsuccess = async (e) => {
                 logger.log(`open database success`, db_name);
@@ -251,27 +251,35 @@ export default class CureBookPageDB {
 
     // #region helper
 
-    /** 断开数据库的连接，并返回该数据库的名字 */
+    private gen_db_name(bid: string) {
+        return `${this.db_name_prefix}-${bid}`;
+    }
+
+    /** 断开数据库的连接，并返回该数据库的名字。
+     * 如果并没有连接该数据库，也会返回其预期规范中的数据库名字
+     */
     exit_conn(bid: string) {
         const conn = this.get_book_conn(bid);
         let db_name: string | undefined;
         if (conn.db !== null) {
             db_name = conn.db.name;
             conn.db.close();
+            logger.log("exit conn", db_name);
+        } else {
+            db_name = this.gen_db_name(bid);
         }
         this.db_map.delete(bid);
-        db_name && logger.log("exit conn", db_name);
         return db_name;
     }
 
     /** 删除指定数据库 */
     async remove(bid: string) {
         const db_name = this.exit_conn(bid);
-        db_name && (await this.raw_remove(db_name));
+        await this.raw_remove(db_name);
     }
 
     /** 删除一个数据库 */
-    async raw_remove(db_name: string) {
+    private async raw_remove(db_name: string) {
         const req = indexedDB.deleteDatabase(db_name);
         new Promise<void>((resolve, reject) => {
             req.onsuccess = () => {
