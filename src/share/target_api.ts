@@ -18,6 +18,12 @@ const BOOK_READER_PAGE = new URLPattern(
     { ignoreCase: true },
 );
 
+/** 书籍在 pdf 阅读界面的网站链接。
+ *
+ * 在此处的唯一作用是：为了获取 pdf 阅读模式下的页数，需要它作为 referer
+ */
+export const BOOK_PDF_READ_PAGE = `https://wqbook.wqxuetang.com/deep/read/pdf?bid=`;
+
 /** 根据书籍阅读页的 url 获取书籍的阅读模式和书籍 id */
 export function get_data_from_read_page(url?: string) {
     const match = BOOK_READER_PAGE.exec(url);
@@ -31,17 +37,22 @@ export function get_data_from_read_page(url?: string) {
 
 /** 获取书籍信息的 API，比如作者、书名、总页数等等。
  *
- * 原本是在【书籍阅读页】中拦截响应读取，但是其中包含的信息很少，
- * 在书记详情页中可以拿到书籍的更多信息，嗯……似乎可以直接请求。
- * 算了，就直接请求吧，问题不大，毕竟只是普通的数据。
+ * 这类 API 有两种
+ * - 在书籍的详情页面
+ * - 在书籍的阅读页面
  *
- * 形如 `https://wqbook.wqxuetang.com/api/v7/book/initbook?bid=3244419`
+ * 想要获取完整的信息还得访问【在书籍阅读页面中的那个】
  *
- * 其中 `bid` 是书籍的 id
+ * 具体见 `doc/about_problem.md` 中的【访问书籍信息】部分。
  *
  * 使用方法：`BOOK_SIMPLE_DATA + bid` 生成对应的链接。
  */
 export const BOOK_SIMPLE_DATA = `${BOOK_HOST}/api/v7/book/initbook?bid=`;
+/** 也是查询书籍的信息，但它原本在书籍的阅读页面中使用。
+ *
+ * 使用方法：`BOOK_SIMPLE_DATA2 + bid` 生成对应的链接。
+ */
+export const BOOK_SIMPLE_DATA2 = `${BOOK_HOST}/api/v7/read/initread?bid=`;
 
 /** 获取书籍目录的 API。
  *

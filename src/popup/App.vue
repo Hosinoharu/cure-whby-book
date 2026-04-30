@@ -30,7 +30,13 @@
             </div>
             <div class="item">
                 <span class="label">页数</span>
-                <span class="value">{{ book_info.pages }}</span>
+                <span class="value">
+                    {{
+                        read_mode === "epub"
+                            ? book_info.pages
+                            : book_info.pdf_pages
+                    }}
+                </span>
             </div>
             <div class="item">
                 <span class="label">ISBN</span>
@@ -160,8 +166,10 @@ async function get_tab_info() {
  * @param force 是否强制重新获取，否则仅仅是从 storage 中更新
  */
 async function update_book_info(force = false) {
+    book_info.value = undefined;
+
     if (__IS_DEV_UI__) {
-        read_mode.value = "pdf";
+        read_mode.value = "epub";
         book_info.value = await get_book_info("dev mode", false);
         return;
     }
@@ -203,15 +211,18 @@ async function get_book_info(
     bid: string,
     from_web: boolean,
 ): Promise<OneBookData | undefined> {
+    // #cure-test 测试静态页面的数据
     if (__IS_DEV_UI__) {
         return {
             name: "从零开始的魔法少女生活",
             author: "Hosinoharu",
             bid: "2026",
             pages: 300,
+            pdf_pages: 500,
             isbn: "1234567890",
             pub: "魔法城堡图书管理部",
             date: "2026-04-30",
+            has_epub: true,
         };
     }
 

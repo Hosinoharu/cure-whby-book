@@ -29,7 +29,8 @@
         "unlimitedStorage",
         "downloads",
         "alarms",
-        "cookies"
+        "cookies",
+        "declarativeNetRequest"
     ],
     "host_permissions": [
         "*://wqbook.wqxuetang.com/",

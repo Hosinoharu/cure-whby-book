@@ -21,8 +21,10 @@ type OneBookSimpleData = {
     bid: string;
     name: string;
     author: string;
-    /** 书籍总页数 */
+    /** 书籍总页数，是 epub 阅读模式下的总页数。为 0 表示没有该模式 */
     pages: number;
+    /** 书籍总页数，是 pdf 阅读模式下的总页数。为 0 表示没有该模式 */
+    pdf_pages: number;
     isbn: string;
     /** 出版日期 */
     date: string;
@@ -30,6 +32,8 @@ type OneBookSimpleData = {
     pub: string;
     /** 书籍的目录信息 */
     catalog?: BookCatalogNode[];
+    /** 是否具备 epub 格式 */
+    has_epub: boolean;
 };
 
 type ContentKind = "xhtml" | "css" | "img";

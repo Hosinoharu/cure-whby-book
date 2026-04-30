@@ -2,7 +2,13 @@
 
 import CureLogger from "./logger";
 import { BookStorageHelper } from "./storage";
-import { BOOK_CATALOG, BOOK_HOST, BOOK_SIMPLE_DATA } from "./target_api";
+import {
+    BOOK_CATALOG,
+    BOOK_HOST,
+    BOOK_PDF_READ_PAGE,
+    BOOK_SIMPLE_DATA,
+    BOOK_SIMPLE_DATA2,
+} from "./target_api";
 
 const logger = new CureLogger("share/request_api");
 
@@ -14,16 +20,15 @@ function check_book_data<T>(book_data: T, error: string): T {
     return book_data;
 }
 
-/** 请求对应 API 获取书籍的基础数据并保存到 storage，成功则返回对应的书籍数据 */
+/** 请求对应 API 获取书籍的基础数据并保存到 storage，成功则返回对应的书籍数据
+ *
+ * @param from 当前阅读页的 url，用于作为请求的 referer
+ */
 export async function save_book_simple_data(
     bid: string,
 ): Promise<OneBookData | undefined> {
     const url = BOOK_SIMPLE_DATA + bid;
-    const response = await fetch(url, {
-        headers: {
-            referer: `${BOOK_HOST}/book/${bid}`,
-        },
-    });
+    const response = await fetch(url);
     const res = await response.json();
 
     if (check_book_data(res.code, "response code is null") !== 0) {
@@ -33,15 +38,33 @@ export async function save_book_simple_data(
     // #cure-warn 该 raw_data 的格式根据实际响应而定
     const raw_data = check_book_data(res.data, "response book data is null");
 
+    // 根据响应判断该书籍是否具备 epub 模式，不保证一定准确
+    const has_epub =
+        check_book_data(raw_data.epubpages, "book has_epub is null") === -2;
+    // 书籍的页数
+    const current_pages = check_book_data(raw_data.pages, "book pages is null");
+    let pages = 0;
+    let pdf_pages = 0;
+    // 有 epub 模式，则是该模式下的页数，否则，就是 pdf 模式下的页数咯
+    if (has_epub) {
+        pages = current_pages;
+        // #cure-warn 需要额外获取 pdf 模式下的页数，避免后续调整阅读模式时重复获取
+        pdf_pages = await get_book_pages_in_pdf_mode(bid);
+    } else {
+        pdf_pages = current_pages;
+    }
+
     const book_data: OneBookData = {
         bid,
         name: check_book_data(raw_data.name, "book name is null"),
         author: check_book_data(raw_data.author, "book author is null"),
-        pages: check_book_data(raw_data.pages, "book pages is null"),
+        pages,
+        pdf_pages,
         date: check_book_data(raw_data.date, "book date is null"),
         isbn: check_book_data(raw_data.isbn, "book isbn is null"),
         pub: check_book_data(raw_data.pub, "book pub is null"),
         catalog: await get_book_catalog(bid),
+        has_epub,
     };
 
     logger.log(
@@ -59,6 +82,30 @@ export async function save_book_simple_data(
     await BookStorageHelper.add_book_data(book_data);
 
     return book_data;
+}
+
+/** 如果具备流失阅读模式，需要获取在 pdf 阅读模式下的总页数 */
+async function get_book_pages_in_pdf_mode(bid: string): Promise<number> {
+    const url = BOOK_SIMPLE_DATA2 + bid;
+    const referer = BOOK_PDF_READ_PAGE + bid;
+    const revoke = await add_referer_to_initread(url, referer);
+
+    let res: any;
+    try {
+        const response = await fetch(url);
+        res = await response.json();
+    } catch {
+        logger.error("fetch book simple data error");
+    } finally {
+        await revoke();
+    }
+
+    if (!res || check_book_data(res.code, "response code is null") !== 0) {
+        return 0;
+    }
+
+    const raw_data = check_book_data(res.data, "response book data is null");
+    return parseInt(check_book_data(raw_data.pages, "book pages is null"));
 }
 
 /** 获取书籍的目录数据 */
@@ -102,4 +149,53 @@ function format_catalog(nodes: any[]): BookCatalogNode[] {
     }
 
     return result;
+}
+
+/** 给插件发出的请求添加 Referer 字段。
+ *
+ * @param target 要请求的 url
+ * @param referer 该请求的 Referer 字段
+ *
+ * 具体说明见 `doc/about_problem.md` 中的【插件访问书籍信息】
+ *
+ * # 用法
+ * ```js
+ * // 临时增加规则
+ * const revoke = await add_referer_to_initread(url, referer);
+ * // 当请求完成之后，撤销规则
+ * await revoke();
+ * ```
+ */
+async function add_referer_to_initread(target: string, referer: string) {
+    await chrome.declarativeNetRequest.updateDynamicRules({
+        removeRuleIds: [1],
+    });
+
+    await chrome.declarativeNetRequest.updateDynamicRules({
+        addRules: [
+            {
+                id: 1,
+                priority: 1,
+                action: {
+                    type: "modifyHeaders",
+                    requestHeaders: [
+                        {
+                            header: "referer",
+                            operation: "set",
+                            value: referer,
+                        },
+                    ],
+                },
+                condition: {
+                    urlFilter: target,
+                },
+            },
+        ],
+    });
+
+    return async () => {
+        await chrome.declarativeNetRequest.updateDynamicRules({
+            removeRuleIds: [1],
+        });
+    };
 }
