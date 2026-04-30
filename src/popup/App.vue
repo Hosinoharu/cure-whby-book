@@ -11,40 +11,47 @@
             <button type="button" @click="">清空缓存</button>
         </section>
 
-        <section class="book-info">
+        <section v-if="book_info" class="book-info">
             <div class="item">
                 <span class="label">书名</span>
-                <span class="value" id="book-name">从零开始的魔法少女生活</span>
+                <span class="value" id="book-name">{{ book_info.name }}</span>
             </div>
             <div class="item">
                 <span class="label">作者</span>
-                <span class="value">Hosinoharu</span>
+                <span class="value">{{ book_info.author }}</span>
             </div>
             <div class="item">
                 <span class="label">BID</span>
-                <span class="value">2026</span>
+                <span class="value">{{ book_info.bid }}</span>
             </div>
             <div class="item">
                 <span class="label">格式</span>
-                <span class="value">PDF</span>
+                <span class="value">{{ read_mode }}</span>
             </div>
             <div class="item">
                 <span class="label">页数</span>
-                <span class="value">300</span>
+                <span class="value">{{ book_info.pages }}</span>
             </div>
             <div class="item">
                 <span class="label">ISBN</span>
-                <span class="value">1234567890</span>
+                <span class="value">{{ book_info.isbn }}</span>
             </div>
             <div class="item">
                 <span class="label">版权</span>
-                <span class="value">魔法城堡图书管理部</span>
+                <span class="value">{{ book_info.pub }}</span>
             </div>
             <div class="item">
                 <span class="label">出版</span>
-                <span class="value">2026-04-30</span>
+                <span class="value">{{ book_info.date }}</span>
             </div>
 
+        </section>
+        <section v-else class="no-book-info">
+            <h2>
+                没有获取到书籍信息
+                <span>&gt;_&lt;</span>
+                似乎出了问题哟
+            </h2>
         </section>
     </main>
 </template>
@@ -56,8 +63,14 @@ import CureEpubGenerator from "./epub_generator";
 import CureLogger from "@/share/logger";
 import { get_data_from_read_page } from "@/share/target_api";
 import CurePdfGenerator from "./pdf_generator";
+import { onMounted, ref } from "vue";
 
 const logger = new CureLogger("popup");
+
+const book_info = ref<OneBookData | undefined>();
+const read_mode = ref<ReadMode | undefined>();
+const tab_info = ref<{ tabId: number, url: string } | undefined>();
+
 
 /** 开启响应拦截 */
 async function start() {
@@ -144,12 +157,69 @@ async function get_tab_info() {
     };
 }
 
+async function get_book_info(bid: string): Promise<OneBookData | undefined> {
+    if (__IS_DEV_UI__) {
+        return {
+            name: "从零开始的魔法少女生活",
+            author: "Hosinoharu",
+            bid: "2026",
+            pages: 300,
+            isbn: "1234567890",
+            pub: "魔法城堡图书管理部",
+            date: "2026-04-30",
+        }
+    }
+
+    let book_data = await BookStorageHelper.get_book_data(bid);
+    if (!book_data) {
+
+    }
+
+    return book_data;
+}
+
+
+onMounted(async () => {
+    if (__IS_DEV_UI__) {
+        read_mode.value = "pdf"
+        book_info.value = await get_book_info("dev mode");
+        return;
+    }
+
+    // #cure-init tab info
+    const _tab_info = await get_tab_info();
+    if (!_tab_info) {
+        logger.error("get tab info failed");
+        return;
+    }
+    tab_info.value = _tab_info;
+
+    // #cure-init read mode
+    const book_data = get_data_from_read_page(tab_info.value.url);
+    if (!book_data.bid || !book_data.mode) {
+        logger.log("get book data failed");
+        return;
+    }
+    read_mode.value = book_data.mode;
+
+    // #cure-init book info
+    book_info.value = await get_book_info(book_data.bid);
+});
+
 </script>
 
 <style>
 * {
     margin: 0;
     padding: 0;
+    box-sizing: border-box;
+}
+
+html {
+    /* Edge、Chrome 浏览器上插件的页面显示不统一，
+     居然是因为 rem 的根大小不同！ 
+    */
+    font-size: 16px;
 }
 
 body {
@@ -162,20 +232,19 @@ body {
     --cure-eclair: #40B9E1;
     --cure-arcana-shadow: #5C438A;
 
-    --font-size: .6em;
+    --font-size: 1rem;
 
     background-color: var(--bg-color);
     color: var(--font-color);
+    width: 400px;
+    height: 400px;
 }
 </style>
 
 <style scoped>
 main {
-    width: 400px;
-    height: 500px;
     border: 1px solid green;
     padding: 10px 20px;
-
     display: flex;
     flex-direction: column;
     align-items: center;
@@ -201,11 +270,12 @@ header {
 }
 
 .btns button {
+    font-size: var(--font-size);
     color: var(--font-color);
     background-color: var(--light-bg-color);
     border: 2px solid var(--border-color);
     padding: 5px 15px;
-    border-radius: 10px;
+    border-radius: 5px;
 
     cursor: pointer;
 }
@@ -224,7 +294,11 @@ header {
 
 .book-info .item {
     display: flex;
-    align-items: center;
+    align-items: stretch;
+}
+
+.book-info .item:hover {
+    outline: 2px solid var(--cure-arcana-shadow);
 }
 
 .book-info span {
@@ -235,16 +309,17 @@ header {
 
 .book-info .label {
     background-color: var(--light-bg-color);
-    width: 10%;
+    width: 4em;
     text-align: right;
 
     border-right: none;
     border-top-left-radius: 5px;
     border-bottom-left-radius: 5px;
+    user-select: none;
 }
 
 .book-info .value {
-    flex-grow: 1;
+    width: calc(100% - 4em);
     border-top-right-radius: 5px;
     border-bottom-right-radius: 5px;
 }
@@ -252,5 +327,22 @@ header {
 #book-name {
     color: var(--cure-eclair);
     font-weight: bold;
+}
+
+.no-book-info h2 {
+    width: fit-content;
+    padding: 10px 30px;
+    margin: auto;
+    text-align: center;
+    color: var(--cure-arcana-shadow);
+    border: 2px solid var(--cure-arcana-shadow);
+    border-radius: 10px;
+}
+
+.no-book-info span {
+    display: block;
+    height: 2em;
+    line-height: 1.8em;
+    color: var(--cure-eclair);
 }
 </style>

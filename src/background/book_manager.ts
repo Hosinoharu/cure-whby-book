@@ -59,10 +59,6 @@ export abstract class CureWhbyBookManager {
                 "book author is null",
             ),
             pages: this.check_book_data(raw_data.pages, "book pages is null"),
-            coverurl: this.check_book_data(
-                raw_data.coverurl,
-                "book cover is null",
-            ),
             date: this.check_book_data(raw_data.date, "book date is null"),
             isbn: this.check_book_data(raw_data.isbn, "book isbn is null"),
             pub: this.check_book_data(raw_data.pub, "book pub is null"),

@@ -24,8 +24,6 @@ type OneBookSimpleData = {
     /** 书籍总页数 */
     pages: number;
     isbn: string;
-    /** 封面图片的 url */
-    coverurl: string;
     /** 出版日期 */
     date: string;
     /** 出版社 */

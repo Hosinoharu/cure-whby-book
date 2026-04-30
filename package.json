@@ -1,7 +1,7 @@
 {
   "name": "cure-whby-book",
   "version": "1.0.0",
-  "description": "download book from WHBY",
+  "description": "请问今天你要下载魔法书吗？～只有我能下载魔法书就立刻学会～",
   "author": "Hosinoharu",
   "license": "MIT",
   "type": "module",
