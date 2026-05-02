@@ -1,7 +1,19 @@
 <template>
     <main>
-        <header>
-            <h1>Cure Whby Book</h1>
+        <header @click="goto_cure">
+            <img class="flower-header" src="./flower.png" alt="cure flower" />
+            <h1>
+                <span>Cure Whby </span>
+                <span style="color: var(--cure-mystique)">B</span>
+                <span style="color: var(--cure-answer)">O</span>
+                <span style="color: var(--cure-eclair)">O</span>
+                <span style="color: var(--cure-arcana-shadow)">K</span>
+            </h1>
+            <img
+                class="flower-header-right"
+                src="./flower2.png"
+                alt="cure flower"
+            />
         </header>
 
         <section class="btns">
@@ -14,7 +26,11 @@
         <section v-if="book_info" class="book-info">
             <div class="item">
                 <span class="label">书名</span>
-                <span class="value" id="book-name">{{ book_info.name }}</span>
+                <span
+                    class="value"
+                    style="color: var(--cure-eclair); font-weight: bold"
+                    >{{ book_info.name }}</span
+                >
             </div>
             <div class="item">
                 <span class="label">作者</span>
@@ -26,7 +42,11 @@
             </div>
             <div class="item">
                 <span class="label">格式</span>
-                <span class="value">{{ read_mode }}</span>
+                <span
+                    class="value"
+                    style="color: var(--cure-answer); font-weight: bold"
+                    >{{ read_mode }}</span
+                >
             </div>
             <div class="item">
                 <span class="label">页数</span>
@@ -59,6 +79,10 @@
             </h2>
         </section>
     </main>
+
+    <footer>
+        <span>{{ status }}</span>
+    </footer>
 </template>
 
 <script setup lang="ts">
@@ -76,6 +100,8 @@ const logger = new CureLogger("popup");
 const book_info = ref<OneBookData | undefined>();
 const read_mode = ref<ReadMode | undefined>();
 const tab_info = ref<{ tabId: number; url: string } | undefined>();
+/** 底部状态条的内容 */
+const status = ref("");
 
 /** 开启响应拦截 */
 async function start() {
@@ -85,6 +111,7 @@ async function start() {
     const tab_info = await get_tab_info();
     const { bid, mode } = get_data_from_read_page(tab_info?.url);
     if (!tab_info || !bid || !mode) {
+        set_status("获取标签页信息失败");
         return;
     }
 
@@ -98,6 +125,8 @@ async function start() {
         },
     };
     await chrome.runtime.sendMessage(data);
+
+    set_status("开始缓存书籍内容");
 }
 
 /** 下载指定的书籍 */
@@ -108,6 +137,7 @@ async function download_book() {
     const tab_info = await get_tab_info();
     const { bid, mode } = get_data_from_read_page(tab_info?.url);
     if (!tab_info || !bid || !mode) {
+        set_status("获取标签页信息失败");
         return;
     }
 
@@ -129,10 +159,12 @@ async function download_book() {
             mode,
         );
         if (book_pages.length === 0) {
+            set_status("并没有缓存该书籍的内容");
             logger.warn("no book pages found", "book name:", book_data.name);
             return;
         }
 
+        set_status(`正在打包生成 ${mode} 文件供下载`);
         if (mode === "epub") {
             const gen = new CureEpubGenerator(
                 book_data,
@@ -146,6 +178,8 @@ async function download_book() {
             );
             gen.pack_and_download();
         }
+    } else {
+        set_status("没有获取到书籍的信息");
     }
 }
 
@@ -171,12 +205,14 @@ async function update_book_info(force = false) {
     if (__IS_DEV_UI__) {
         read_mode.value = "epub";
         book_info.value = await get_book_info("dev mode", false);
+        set_status("当前展示的是开发模式下的信息");
         return;
     }
 
     // #cure-init tab info
     const _tab_info = await get_tab_info();
     if (!_tab_info) {
+        set_status("获取标签页信息失败");
         logger.error("get tab info failed");
         return;
     }
@@ -185,6 +221,7 @@ async function update_book_info(force = false) {
     // #cure-init read mode
     const book_data = get_data_from_read_page(tab_info.value.url);
     if (!book_data.bid || !book_data.mode) {
+        set_status("从当前 URL 中获取书籍的 id 失败");
         logger.log("get book data failed");
         return;
     }
@@ -192,6 +229,8 @@ async function update_book_info(force = false) {
 
     // #cure-init book info
     book_info.value = await get_book_info(book_data.bid, force);
+
+    set_status("初始化完成");
 }
 
 /** 清空书籍所有的信息，包括下载的消息哟 */
@@ -201,6 +240,7 @@ async function clear_book_data() {
     const bid = book_info.value.bid;
     await BookStorageHelper.remove_book_data(bid);
     await CureBookPageDB.Instance.remove(bid);
+    set_status("已清空缓存");
 }
 
 /** 从 storage 或者 web 获取书籍信息
@@ -234,6 +274,23 @@ async function get_book_info(
     return book_data;
 }
 
+function set_status(s: string) {
+    status.value = s;
+}
+
+async function goto_cure() {
+    if (__IS_DEV_UI__) return;
+
+    await chrome.tabs.create({
+        url: "https://www.toei-anim.co.jp/tv/precure/",
+    });
+}
+
+!__IS_DEV_UI__ &&
+    chrome.debugger.onDetach.addListener((debuggee) => {
+        set_status("已停止缓存书籍的内容");
+    });
+
 onMounted(async () => {
     await update_book_info();
 });
@@ -254,14 +311,16 @@ html {
 }
 
 body {
-    --bg-color: #222;
-    --light-bg-color: #333;
-    --font-color: #ccc;
-    --border-color: #4c4d4f;
+    --bg-color: #303336;
+    --light-bg-color: #404346;
+    --font-color: #eee;
+    --dark-font-color: #888;
+    --border-color: #4f4e4c;
+
     --cure-answer: #c576ff;
     --cure-mystique: #fe6998;
     --cure-eclair: #40b9e1;
-    --cure-arcana-shadow: #5c438a;
+    --cure-arcana-shadow: #ea9a7e;
 
     --font-size: 1rem;
 
@@ -275,11 +334,10 @@ body {
 <style scoped>
 main {
     /* border: 1px solid green; */
-    padding: 10px 20px;
+    padding: 10px 20px 30px;
     display: flex;
     flex-direction: column;
     align-items: center;
-    gap: 10px;
 }
 
 section {
@@ -287,8 +345,16 @@ section {
 }
 
 header {
-    color: var(--cure-mystique);
+    position: relative;
+    font-family: "Segoe UI";
+    font-size: 1rem;
+    letter-spacing: 3px;
+    margin-bottom: 15px;
     user-select: none;
+}
+
+header::first-letter {
+    color: var(--cure-answer);
 }
 
 .btns {
@@ -300,9 +366,9 @@ header {
 }
 
 .btns button {
-    font-size: var(--font-size);
+    font-size: 0.8rem;
     color: var(--font-color);
-    background-color: var(--light-bg-color);
+    background-color: transparent;
     border: 2px solid var(--border-color);
     padding: 5px 15px;
     border-radius: 5px;
@@ -310,16 +376,39 @@ header {
     cursor: pointer;
 }
 
+.btns button:active {
+    transform: scale(0.8);
+}
+
 .btns button:hover {
     color: var(--cure-answer);
     border-color: var(--cure-answer);
+    animation: shake 0.3s ease-in-out;
+}
+
+@keyframes shake {
+    0% {
+        transform: rotate(0deg);
+    }
+    25% {
+        transform: rotate(8deg);
+    }
+    50% {
+        transform: rotate(0deg);
+    }
+    75% {
+        transform: rotate(-8deg);
+    }
+    100% {
+        transform: rotate(0deg);
+    }
 }
 
 .book-info {
     display: flex;
     flex-direction: column;
     gap: 5px;
-    font-size: var(--font-size);
+    font-size: 0.8rem;
 }
 
 .book-info .item {
@@ -354,11 +443,6 @@ header {
     border-bottom-right-radius: 5px;
 }
 
-#book-name {
-    color: var(--cure-eclair);
-    font-weight: bold;
-}
-
 .no-book-info h2 {
     width: fit-content;
     padding: 10px 30px;
@@ -374,5 +458,42 @@ header {
     height: 2em;
     line-height: 1.8em;
     color: var(--cure-eclair);
+}
+
+footer {
+    position: fixed;
+    left: 0;
+    bottom: 0;
+    width: 100%;
+    padding: 2px 10px;
+    font-size: 0.6rem;
+    color: var(--dark-font-color);
+    background-color: var(--bg-color);
+    border-top: 1px solid var(--cure-mystique);
+}
+
+.flower-header {
+    position: absolute;
+    scale: 0.2;
+    left: -4rem;
+    top: -3rem;
+    animation: flower 5s linear infinite;
+}
+
+.flower-header-right {
+    position: absolute;
+    scale: 0.2;
+    right: -4rem;
+    bottom: -3.5rem;
+    animation: flower 5s linear infinite reverse;
+}
+
+@keyframes flower {
+    0% {
+        transform: rotate(0deg);
+    }
+    100% {
+        transform: rotate(360deg);
+    }
 }
 </style>

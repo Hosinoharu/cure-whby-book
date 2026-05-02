@@ -52,8 +52,14 @@ export default defineConfig(({ mode }) => ({
                         return "lib/" + (name || "vendor");
                     }
                 },
-                chunkFileNames: "[name].js",
-                assetFileNames: "[name].[ext]",
+                chunkFileNames: (chunk_info) => {
+                    const prefix = chunk_info.name.startsWith("lib/")
+                        ? ""
+                        : "lib/";
+                    return prefix + "[name].js";
+                },
+                // 只有 popup page 才会这些东西哟
+                assetFileNames: "popup/[name].[ext]",
             },
         },
         outDir,
