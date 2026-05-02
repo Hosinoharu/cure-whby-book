@@ -272,6 +272,14 @@ export default class CureBookPageDB {
         return db_name;
     }
 
+    /** 断开所有数据库连接，当手动取消调式时调用它哟 */
+    exit_all_conn() {
+        Array.from(this.db_map.values()).forEach((conn) => {
+            conn.db?.close();
+        });
+        this.db_map.clear();
+    }
+
     /** 删除指定数据库 */
     async remove(bid: string) {
         const db_name = this.exit_conn(bid);

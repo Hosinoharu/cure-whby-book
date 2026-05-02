@@ -73,9 +73,9 @@
         </section>
         <section v-else class="no-book-info">
             <h2>
-                没有获取到书籍信息
+                没有书籍信息
                 <span>&gt;_&lt;</span>
-                似乎出了问题哟
+                点击 [ 更新 ] 尝试获取
             </h2>
         </section>
     </main>
@@ -83,6 +83,7 @@
     <footer>
         <span>{{ status }}</span>
     </footer>
+    <img class="flower-bottom" src="./flower.png" alt="cure flower" />
 </template>
 
 <script setup lang="ts">
@@ -111,7 +112,7 @@ async function start() {
     const tab_info = await get_tab_info();
     const { bid, mode } = get_data_from_read_page(tab_info?.url);
     if (!tab_info || !bid || !mode) {
-        set_status("获取标签页信息失败");
+        set_status("从当前 URL 中获取书籍的 id 失败");
         return;
     }
 
@@ -137,7 +138,7 @@ async function download_book() {
     const tab_info = await get_tab_info();
     const { bid, mode } = get_data_from_read_page(tab_info?.url);
     if (!tab_info || !bid || !mode) {
-        set_status("获取标签页信息失败");
+        set_status("从当前 URL 中获取书籍的 id 失败");
         return;
     }
 
@@ -204,7 +205,7 @@ async function update_book_info(force = false) {
 
     if (__IS_DEV_UI__) {
         read_mode.value = "epub";
-        book_info.value = await get_book_info("dev mode", false);
+        // book_info.value = await get_book_info("dev mode", false);
         set_status("当前展示的是开发模式下的信息");
         return;
     }
@@ -240,6 +241,7 @@ async function clear_book_data() {
     const bid = book_info.value.bid;
     await BookStorageHelper.remove_book_data(bid);
     await CureBookPageDB.Instance.remove(bid);
+    book_info.value = undefined;
     set_status("已清空缓存");
 }
 
@@ -446,7 +448,7 @@ header::first-letter {
 .no-book-info h2 {
     width: fit-content;
     padding: 10px 30px;
-    margin: auto;
+    margin: 10px auto 0;
     text-align: center;
     color: var(--cure-arcana-shadow);
     border: 2px solid var(--cure-arcana-shadow);
@@ -470,6 +472,7 @@ footer {
     color: var(--dark-font-color);
     background-color: var(--bg-color);
     border-top: 1px solid var(--cure-mystique);
+    z-index: 2;
 }
 
 .flower-header {
@@ -486,6 +489,15 @@ footer {
     right: -4rem;
     bottom: -3.5rem;
     animation: flower 5s linear infinite reverse;
+}
+
+.flower-bottom {
+    position: fixed;
+    scale: 0.5;
+    left: 35%;
+    bottom: -2.5rem;
+    animation: flower 15s linear infinite;
+    z-index: 1;
 }
 
 @keyframes flower {

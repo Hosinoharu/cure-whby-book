@@ -85,6 +85,13 @@ async function set_extension_status_on_tab(tabId: number, url?: string) {
 chrome.tabs.onUpdated.addListener(async (tabId, changeInfo, tab) => {
     if (changeInfo.status === "loading") {
         await set_extension_status_on_tab(tabId, tab.url);
+
+        // 在开启调试后，如果先【设置插件状态】，那么后续开始自动化时会刷新网页
+        // 网页刷新之后就不再显示插件启动的标示了，所以在在这里重新设置一下
+        const target = await ExtensionConfigHelper.get_target_tab();
+        if (target === tabId) {
+            await set_extension_downloading_status(tabId, true);
+        }
     }
 });
 
@@ -101,6 +108,7 @@ chrome.tabs.onActivated.addListener(async (activeInfo) => {
 chrome.debugger.onDetach.addListener(async (debuggee, reason) => {
     const { tabId } = debuggee;
     if (tabId) {
+        CureBookPageDB.Instance.exit_all_conn();
         await set_extension_downloading_status(tabId, false);
         await stop_auto_action();
         await ExtensionConfigHelper.set_target_tab(null);
@@ -117,7 +125,6 @@ chrome.runtime.onMessage.addListener(
                 sendResponse();
                 const { tabId, bid } = request.data;
                 await start_debugger(tabId);
-                await set_extension_downloading_status(tabId, true);
                 await ExtensionConfigHelper.set_target_tab(tabId);
 
                 // #cure-tip 开启监听之后，立即创建数据库，并开启页面自动化翻页
