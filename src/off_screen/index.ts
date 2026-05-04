@@ -14,15 +14,13 @@ chrome.runtime.onMessage.addListener(
 
         if (request.from !== "bg" || request.to !== "off-screen") return;
 
-        switch (request.type) {
-            case "start-pack":
-                const url = await gen_download_url(
-                    request.data.bid,
-                    request.data.mode,
-                    request.data.book_data,
-                );
-                sendResponse(url);
-                break;
+        if (request.type === "start-pack") {
+            const url = await gen_download_url(
+                request.data.bid,
+                request.data.mode,
+                request.data.book_data,
+            );
+            return url;
         }
     },
 );

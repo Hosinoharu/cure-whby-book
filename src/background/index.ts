@@ -180,7 +180,6 @@ chrome.runtime.onMessage.addListener(
         logger.log("popup message", request);
         switch (request.type) {
             case "start-debugger":
-                sendResponse();
                 const { tabId, bid, mode } = request.data;
                 await start_debugger(tabId);
                 await ExtensionConfigHelper.set_current_download(
@@ -194,7 +193,6 @@ chrome.runtime.onMessage.addListener(
                 await start_auto_action(tabId);
                 break;
             case "start-pack":
-                sendResponse();
                 await finish_download(
                     request.data.tabId,
                     request.data.bid,
