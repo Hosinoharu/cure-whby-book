@@ -98,10 +98,8 @@
 <script setup lang="ts">
 import CureBookPageDB from "@/share/book_page_db";
 import { BookStorageHelper } from "@/share/storage";
-import CureEpubGenerator from "./epub_generator";
 import CureLogger from "@/share/logger";
 import { get_data_from_read_page } from "@/share/target_api";
-import CurePdfGenerator from "./pdf_generator";
 import { onMounted, ref } from "vue";
 import { save_book_simple_data } from "@/share/request_api";
 
@@ -117,21 +115,19 @@ const status = ref("");
 async function start() {
     if (__IS_DEV_UI__) return;
 
-    // #cure-test/warn 在阅读页面开启插件功能
-    const tab_info = await get_tab_info();
-    const { bid, mode } = get_data_from_read_page(tab_info?.url);
-    if (!tab_info || !bid || !mode) {
-        set_status("从当前 URL 中获取书籍的 id 失败");
+    if (!book_info.value || !read_mode.value || !tab_info.value) {
+        set_status("初始化当前网页信息失败");
         return;
     }
 
-    // #cure-tip 发送消息给 background 让它启动
     const data: MsgInBgAndPopup = {
         type: "start-debugger",
+        from: "popup",
+        to: "bg",
         data: {
-            tabId: tab_info.tabId,
-            mode,
-            bid,
+            tabId: tab_info.value.tabId,
+            mode: read_mode.value,
+            bid: book_info.value.bid,
         },
     };
     await chrome.runtime.sendMessage(data);
@@ -139,58 +135,28 @@ async function start() {
     set_status("开始缓存书籍内容");
 }
 
-/** 下载指定的书籍 */
+/** 发送信息给 background，开始下载书籍 */
 async function download_book() {
     if (__IS_DEV_UI__) return;
 
-    // #cure-test 测试打包，在当前阅读界面点击下载就可以
-    const tab_info = await get_tab_info();
-    const { bid, mode } = get_data_from_read_page(tab_info?.url);
-    if (!tab_info || !bid || !mode) {
-        set_status("从当前 URL 中获取书籍的 id 失败");
+    if (!book_info.value || !read_mode.value || !tab_info.value) {
+        set_status("初始化当前网页信息失败");
         return;
     }
 
-    const book_data = await BookStorageHelper.get_book_data(bid);
-    if (book_data) {
-        // #cure-tip 需要先让 background 断开该数据库的连接
-        const data: MsgInBgAndPopup = {
-            type: "start-pack",
-            data: {
-                bid,
-                mode,
-                tabId: tab_info.tabId,
-            },
-        };
-        await chrome.runtime.sendMessage(data);
+    set_status(`正在打包生成 ${read_mode.value} 文件供下载`);
 
-        const book_pages = await CureBookPageDB.Instance.get_all_pages(
-            bid,
-            mode,
-        );
-        if (book_pages.length === 0) {
-            set_status("并没有缓存该书籍的内容");
-            logger.warn("no book pages found", "book name:", book_data.name);
-            return;
-        }
-
-        set_status(`正在打包生成 ${mode} 文件供下载`);
-        if (mode === "epub") {
-            const gen = new CureEpubGenerator(
-                book_data,
-                book_pages as EpubBookPageStoreItem[],
-            );
-            gen.pack_and_download();
-        } else {
-            const gen = new CurePdfGenerator(
-                book_data,
-                book_pages as PdfBookPageStoreItem[],
-            );
-            gen.pack_and_download();
-        }
-    } else {
-        set_status("没有获取到书籍的信息");
-    }
+    const data: MsgInBgAndPopup = {
+        type: "start-pack",
+        from: "popup",
+        to: "bg",
+        data: {
+            bid: book_info.value.bid,
+            mode: read_mode.value,
+            tabId: tab_info.value.tabId,
+        },
+    };
+    await chrome.runtime.sendMessage(data);
 }
 
 async function get_tab_info() {

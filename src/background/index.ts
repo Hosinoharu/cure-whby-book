@@ -4,7 +4,7 @@ import CureLogger from "@/share/logger";
 import { get_data_from_read_page } from "@/share/target_api";
 import { start_debugger, stop_debugger } from "./reqres_handler";
 import { start_auto_action, stop_auto_action } from "./auto_action";
-import { ExtensionConfigHelper } from "@/share/storage";
+import { BookStorageHelper, ExtensionConfigHelper } from "@/share/storage";
 
 const logger = new CureLogger("bg/index");
 logger.log("Cure Cure ~\\(≧▽≦)/~");
@@ -93,6 +93,58 @@ chrome.tabs.onActivated.addListener(async (activeInfo) => {
 
 // #endregion
 
+// #region chat with off screen
+
+/** 使用 off_screen 来打包、下载书籍哟 */
+async function init_off_screen() {
+    if (!(await chrome.offscreen.hasDocument())) {
+        await chrome.offscreen.createDocument({
+            url: "/off_screen/index.html",
+            // 打包之后需要生成 blob url 嘛
+            reasons: ["BLOBS"],
+            justification: "gen book download url",
+        });
+    }
+}
+
+async function close_off_screen() {
+    await chrome.offscreen.closeDocument();
+}
+
+async function start_pack(bid: string, mode: ReadMode) {
+    const book_data = await BookStorageHelper.get_book_data(bid);
+    if (!book_data) return;
+
+    const data: MsgInBgAndOffScreen = {
+        type: "start-pack",
+        from: "bg",
+        to: "off-screen",
+        data: {
+            bid,
+            mode,
+            book_data,
+        },
+    };
+
+    // 拿到的是最终的下载 url
+    const url = await chrome.runtime.sendMessage(data);
+    if (!url) {
+        logger.error("gen download url failed");
+        return;
+    }
+
+    const filename = `${book_data.name}(${book_data.author}).${mode}`;
+    const downloadId = await chrome.downloads.download({
+        url: url,
+        filename: __IS_DEV__ ? `test.${mode}` : filename,
+        // 测试的时候直接覆盖下载的文件
+        conflictAction: __IS_DEV__ ? "overwrite" : undefined,
+        saveAs: !__IS_DEV__,
+    });
+}
+
+// #endregion
+
 // #cure-tip 手动关闭了标签页的调试
 chrome.debugger.onDetach.addListener(async (debuggee, reason) => {
     const { tabId } = debuggee;
@@ -100,6 +152,7 @@ chrome.debugger.onDetach.addListener(async (debuggee, reason) => {
         CureBookPageDB.Instance.exit_all_conn();
         await set_extension_downloading_status(tabId, false);
         await stop_auto_action();
+        await close_off_screen();
         await ExtensionConfigHelper.set_target_tab(null);
         logger.log("debugger detached", tabId);
     }
@@ -108,6 +161,8 @@ chrome.debugger.onDetach.addListener(async (debuggee, reason) => {
 // #cure-core 监听 popup 消息，开启标签页的 debugger
 chrome.runtime.onMessage.addListener(
     async (request: MsgInBgAndPopup, sender, sendResponse) => {
+        if (request.from !== "popup" || request.to !== "bg") return;
+
         logger.log("popup message", request);
         switch (request.type) {
             case "start-debugger":
@@ -132,6 +187,10 @@ chrome.runtime.onMessage.addListener(
 
                 await stop_auto_action();
                 sendResponse();
+
+                await init_off_screen();
+                await start_pack(request.data.bid, request.data.mode);
+                await close_off_screen();
                 break;
         }
     },

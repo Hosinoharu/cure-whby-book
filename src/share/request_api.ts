@@ -4,7 +4,6 @@ import CureLogger from "./logger";
 import { BookStorageHelper } from "./storage";
 import {
     BOOK_CATALOG,
-    BOOK_HOST,
     BOOK_PDF_READ_PAGE,
     BOOK_SIMPLE_DATA,
     BOOK_SIMPLE_DATA2,

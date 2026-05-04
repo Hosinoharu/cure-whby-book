@@ -300,8 +300,8 @@ ${spine_item.join("\n")}
 
     // #endregion
 
-    /** 生成一个打包后的 zip，再让插件触发下载 */
-    async pack_and_download() {
+    /** 生成 blob url 用于下载 */
+    async gen_download_url() {
         this.write_file_mimetype();
         this.write_file_container();
         this.write_file_opf();
@@ -311,16 +311,8 @@ ${spine_item.join("\n")}
             mimeType: "application/epub+zip",
         });
         const url = URL.createObjectURL(blob);
-        try {
-            // #cure-todo 下载完成之后自动清理数据库保存的书籍信息？还是手动清除？
-            const downloadId = await chrome.downloads.download({
-                url,
-                filename: `${this.book_data.name}(${this.book_data.author}).epub`,
-                saveAs: true,
-            });
-        } catch (e) {
-            logger.error("download epub error", e);
-        }
+
+        return url;
     }
 }
 

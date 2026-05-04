@@ -143,7 +143,8 @@ export default class CurePdfGenerator {
         node.children?.forEach((c) => this.raw_add_bookmark(new_parent, c));
     }
 
-    async pack_and_download() {
+    /** 生成打包后的书籍的下载链接 */
+    async gen_download_url() {
         for (let i = 0; i < this.book_pages.length; i++) {
             const page = this.book_pages[i];
             const img = await this.merge_split_imgs(page.content);
@@ -162,13 +163,7 @@ export default class CurePdfGenerator {
         this.add_bookmark();
 
         const url = this.pdf.output("bloburl");
-        const filename = `${this.book_data.name}(${this.book_data.author}).pdf`;
-        const downloadId = await chrome.downloads.download({
-            url: url.toString(),
-            filename: __IS_DEV__ ? "test.pdf" : filename,
-            // 测试的时候直接覆盖下载的文件
-            conflictAction: __IS_DEV__ ? "overwrite" : undefined,
-            saveAs: !__IS_DEV__,
-        });
+
+        return url;
     }
 }

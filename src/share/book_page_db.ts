@@ -27,7 +27,7 @@ const DEBUG = {
 export default class CureBookPageDB {
     private static instance?: CureBookPageDB;
 
-    private readonly db_name_prefix = chrome.runtime.getManifest().name;
+    private readonly db_name_prefix = "CureWhbyBook";
     private readonly store_name = "book_pages";
     /** 存储所有数据库连接 */
     private readonly db_map = new Map<string, OneBookDBConnection>();

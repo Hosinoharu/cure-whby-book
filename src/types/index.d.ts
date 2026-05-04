@@ -73,19 +73,44 @@ type SplitPageOrder = 0 | 1 | 2 | 3 | 4 | 5;
 /** 存储 6 个小图片的类型 */
 type PdfSplitImageContent = Record<SplitPageOrder, string>;
 
-// #region background 和 popup 通信的数据格式
+// #region 通信的数据格式
+
+type BaseMsg = {
+    type: string;
+    /** 消息的发送方 */
+    from: "popup" | "bg";
+    /** 消息的接收方 */
+    to: "popup" | "bg" | "off-screen";
+    data: unknown;
+};
 
 /** background 和 popup 通信的数据格式 */
-type MsgInBgAndPopup = {
+type MsgInBgAndPopup = BaseMsg & {
     /**
      * start-debugger: 启动调试模式
      * start-pack: 通知 bg 即将打包 epub 并下载
      */
     type: "start-debugger" | "start-pack";
+    from: "popup";
+    to: "bg";
     data: {
         tabId: number;
         mode: ReadMode;
         bid: string;
+    };
+};
+
+/** background 和 off-screen 通信的数据格式 */
+type MsgInBgAndOffScreen = BaseMsg & {
+    /** start-pack: 通知开始打包 */
+    type: "start-pack";
+    from: "bg";
+    to: "off-screen";
+    data: {
+        bid: string;
+        mode: ReadMode;
+        /** 因为 off screen 使用的 chrome API 很少！需要传递书籍数据 */
+        book_data: OneBookData;
     };
 };
 

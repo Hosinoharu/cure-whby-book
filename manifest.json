@@ -30,7 +30,8 @@
         "downloads",
         "alarms",
         "cookies",
-        "declarativeNetRequest"
+        "declarativeNetRequest",
+        "offscreen"
     ],
     "host_permissions": [
         "*://wqbook.wqxuetang.com/",

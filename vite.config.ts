@@ -32,6 +32,10 @@ export default defineConfig(({ mode }) => ({
                     "src/background/index.ts",
                 ),
                 popup: path.resolve(__dirname, "src/popup/index.html"),
+                off_screen: path.resolve(
+                    __dirname,
+                    "src/off_screen/index.html",
+                ),
             },
             output: {
                 entryFileNames: (chunk_info) => {
@@ -40,6 +44,8 @@ export default defineConfig(({ mode }) => ({
                         prefix = "background/";
                     } else if (chunk_info.name === "popup") {
                         prefix = "popup/";
+                    } else if (chunk_info.name === "off_screen") {
+                        prefix = "off_screen/";
                     }
                     return prefix + "[name].js";
                 },
