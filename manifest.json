@@ -1,0 +1,41 @@
+{
+    "name": "CureWhbyBook",
+    "short_name": "CureWhbook",
+    "manifest_version": 3,
+    "version": "1.0.0",
+    "description": "请问今天你要下载魔法书吗？～只有我能下载魔法书就立刻学会～",
+    "icons": {
+        "16": "icons/icon-16.png",
+        "32": "icons/icon-32.png",
+        "64": "icons/icon-64.png",
+        "128": "icons/icon-128.png"
+    },
+    "action": {
+        "default_popup": "popup/index.html",
+        "default_icon": "icons/icon-64.png"
+    },
+    "background": {
+        "service_worker": "background/service_worker.js",
+        "type": "module"
+    },
+    "content_security_policy": {
+        "extension_pages": "script-src 'self' 'wasm-unsafe-eval'; object-src 'self';"
+    },
+    "permissions": [
+        "activeTab",
+        "tabs",
+        "debugger",
+        "storage",
+        "unlimitedStorage",
+        "downloads",
+        "alarms",
+        "cookies",
+        "declarativeNetRequest",
+        "offscreen"
+    ],
+    "host_permissions": [
+        "*://wqbook.wqxuetang.com/",
+        "*://wqbook.wqxuetang.com/deep/read/epub*",
+        "*://wqbook.wqxuetang.com/deep/read/pdf*"
+    ]
+}

@@ -1,0 +1,27 @@
+{
+  "name": "cure-whby-book",
+  "version": "1.0.0",
+  "description": "请问今天你要下载魔法书吗？～只有我能下载魔法书就立刻学会～",
+  "author": "Hosinoharu",
+  "license": "MIT",
+  "type": "module",
+  "scripts": {
+    "build": "vite build",
+    "build-dev": "vite build --mode dev",
+    "dev-popup": "vite dev --config ./src/popup/vite.config.ts"
+  },
+  "dependencies": {
+    "crypto-js": "^4.2.0",
+    "jspdf": "^4.2.1",
+    "jszip": "^3.10.1",
+    "vue": "^3.5.33"
+  },
+  "devDependencies": {
+    "@types/chrome": "^0.1.40",
+    "@types/crypto-js": "^4.2.2",
+    "@types/node": "^25.6.0",
+    "@vitejs/plugin-vue": "^6.0.6",
+    "devtools-protocol": "^0.0.1612613",
+    "vite": "^8.0.8"
+  }
+}

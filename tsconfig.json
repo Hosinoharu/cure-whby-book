@@ -1,0 +1,16 @@
+{
+    "compilerOptions": {
+        "target": "es2022",
+        "module": "esnext",
+        "paths": {
+            "@/*": [
+                "./src/*"
+            ]
+        },
+        "strict": true,
+    },
+    "include": [
+        "src",
+        "node_modules/@types"
+    ]
+}
