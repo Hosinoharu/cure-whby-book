@@ -118,10 +118,7 @@ async function get_book_pages_in_pdf_mode(bid: string): Promise<number> {
  * 已经调整了实现，具体见 `doc/analysis.md` 中的【书籍大纲、目录】部分。
  */
 async function get_book_catalog(bid: string): Promise<BookCatalogNode[]> {
-    const a_catalog = await get_book_catalog_raw(bid);
-    const b_catalog = await get_book_catalog_raw(bid, BOOK_PDF_READ_PAGE + bid);
-
-    return merge_catalog(a_catalog, b_catalog);
+    return await get_book_catalog_raw(bid, BOOK_PDF_READ_PAGE + bid);
 }
 
 async function get_book_catalog_raw(
@@ -173,54 +170,6 @@ function format_catalog(nodes: any[]): BookCatalogNode[] {
     }
 
     return result;
-}
-
-/** 具体见 `doc/analysis.md` 中的【书籍大纲、目录】部分。
- *
- * @param a 普通情况下的目录信息
- * @param b pdf 阅读模式下的目录信息
- */
-function merge_catalog(
-    a: BookCatalogNode[],
-    b: BookCatalogNode[],
-): BookCatalogNode[] {
-    debugger;
-    // 先提取出 a 中的三级大纲，由二级标题为 key，存储它所在的页数以及子节点
-    const third_level = new Map<
-        string,
-        { pnum: number; children: BookCatalogNode[] }
-    >();
-    // 实践过程中，根据标题为 key 似乎不可靠呀，出现了非英文的空格等等情况
-    // 所以使用正则提取出前面的序号咯。注意只匹配二级大纲哟
-    const pattern = /^\d.\d/;
-    for (const level1 of a) {
-        level1.children?.forEach((level2) => {
-            if (level2.children) {
-                const key = pattern.exec(level2.label)?.[0];
-                key &&
-                    third_level.set(key, {
-                        pnum: level2.pnum,
-                        children: level2.children,
-                    });
-            }
-        });
-    }
-
-    // 然后补全 b 中的三级大纲
-    for (const level1 of b) {
-        level1.children?.forEach((level2) => {
-            const key = pattern.exec(level2.label)?.[0];
-            const third = key ? third_level.get(key) : undefined;
-            if (third) {
-                const step = level2.pnum - third.pnum;
-                level2.children = third.children?.map((node) => {
-                    return { ...node, pnum: node.pnum + step };
-                });
-            }
-        });
-    }
-
-    return b;
 }
 
 /** 给插件发出的请求添加 Referer 字段。
