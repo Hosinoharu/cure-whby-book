@@ -77,8 +77,8 @@ chrome.tabs.onUpdated.addListener(async (tabId, changeInfo, tab) => {
 
         // 在开启调试后，如果先【设置插件状态】，那么后续开始自动化时会刷新网页
         // 网页刷新之后就不再显示插件启动的标示了，所以在在这里重新设置一下
-        const target = await ExtensionConfigHelper.get_target_tab();
-        if (target === tabId) {
+        const target = await ExtensionConfigHelper.get_current_download();
+        if (target?.tabId === tabId) {
             await set_extension_downloading_status(tabId, true);
         }
     }
@@ -145,6 +145,20 @@ async function start_pack(bid: string, mode: ReadMode) {
 
 // #endregion
 
+/** 结束调试、释放数据库链接等等操作之后，开始打包书籍 */
+async function finish_download(tabId: number, bid: string, mode: ReadMode) {
+    // #cure-tip 取消监听时需要第一时间断开数据库连接啦
+    CureBookPageDB.Instance.exit_conn(bid);
+    await stop_auto_action();
+    await stop_debugger(tabId);
+    await set_extension_downloading_status(tabId, false);
+    await ExtensionConfigHelper.clear_current_download();
+
+    await init_off_screen();
+    await start_pack(bid, mode);
+    await close_off_screen();
+}
+
 // #cure-tip 手动关闭了标签页的调试
 chrome.debugger.onDetach.addListener(async (debuggee, reason) => {
     const { tabId } = debuggee;
@@ -153,7 +167,7 @@ chrome.debugger.onDetach.addListener(async (debuggee, reason) => {
         await set_extension_downloading_status(tabId, false);
         await stop_auto_action();
         await close_off_screen();
-        await ExtensionConfigHelper.set_target_tab(null);
+        await ExtensionConfigHelper.clear_current_download();
         logger.log("debugger detached", tabId);
     }
 });
@@ -167,31 +181,45 @@ chrome.runtime.onMessage.addListener(
         switch (request.type) {
             case "start-debugger":
                 sendResponse();
-                const { tabId, bid } = request.data;
+                const { tabId, bid, mode } = request.data;
                 await start_debugger(tabId);
-                await ExtensionConfigHelper.set_target_tab(tabId);
+                await ExtensionConfigHelper.set_current_download(
+                    tabId,
+                    bid,
+                    mode,
+                );
 
                 // #cure-tip 开启监听之后，立即创建数据库，并开启页面自动化翻页
                 await CureBookPageDB.Instance.init(bid);
                 await start_auto_action(tabId);
                 break;
             case "start-pack":
-                // #cure-tip 取消监听时需要第一时间断开数据库连接啦
-                CureBookPageDB.Instance.exit_conn(request.data.bid);
-                await stop_debugger(request.data.tabId);
-                await set_extension_downloading_status(
-                    request.data.tabId,
-                    false,
-                );
-                await ExtensionConfigHelper.set_target_tab(null);
-
-                await stop_auto_action();
                 sendResponse();
-
-                await init_off_screen();
-                await start_pack(request.data.bid, request.data.mode);
-                await close_off_screen();
+                await finish_download(
+                    request.data.tabId,
+                    request.data.bid,
+                    request.data.mode,
+                );
                 break;
         }
     },
 );
+
+// #cure-warn 监听下载进度，完成后自动开启打包等等
+chrome.storage.onChanged.addListener(async (changes, namespace) => {
+    if (namespace !== "local") return;
+
+    // logger.log("changes", changes);
+
+    const extension_config = changes[ExtensionConfigHelper.name];
+    if (!extension_config || !extension_config.newValue) return;
+
+    const new_value = extension_config.newValue as Partial<ExtensionConfig>;
+
+    if (new_value.complete) {
+        const data = await ExtensionConfigHelper.get_current_download();
+        if (data?.tabId && data.bid && data.mode) {
+            await finish_download(data.tabId, data.bid, data.mode);
+        }
+    }
+});

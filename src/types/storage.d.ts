@@ -10,7 +10,13 @@ type StorageStruct = {
 /** 插件自身的配置项 */
 type ExtensionConfig = {
     /** 只能下载一本书。开启监听时，该值就记录监听的 tabId，取消监听时重置它 */
-    target_tab: number | null;
+    tabId?: number | null;
+    /** 记录当前正在下载的书籍 id */
+    bid?: string;
+    /** 记录当前正在下载的书籍模式 */
+    mode?: ReadMode;
+    /** 为 true 已经下载完了一本书，可以启动自动下载哟 */
+    complete?: boolean;
 };
 
 /** 保存一本书的完整信息 */

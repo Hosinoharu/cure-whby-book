@@ -157,7 +157,7 @@ export default class CurePdfGenerator {
                 this.pagee_width,
                 this.page_height,
             );
-            i < this.book_pages.length - 2 && this.pdf.addPage();
+            i <= this.book_pages.length - 2 && this.pdf.addPage();
         }
 
         this.add_bookmark();

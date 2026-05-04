@@ -95,7 +95,7 @@ async function get_main_frame(tabId: number) {
 }
 
 chrome.alarms.onAlarm.addListener(async (alarm) => {
-    const tabId = await ExtensionConfigHelper.get_target_tab();
+    const tabId = (await ExtensionConfigHelper.get_current_download())?.tabId;
     if (tabId) {
         const targetId = await get_main_frame(tabId);
         targetId && (await press_arrow_down_key(targetId));

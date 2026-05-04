@@ -66,31 +66,56 @@ export abstract class BookStorageHelper {
         const book = await this.get_book_data(bid);
         if (book === undefined) return;
 
+        let complete = false;
+
         if (mode === "epub") {
             book.cached_pages = (book.cached_pages ?? 0) + 1;
+            complete = book.cached_pages === book.pages;
         } else {
             book.cached_pdf_pages = (book.cached_pdf_pages ?? 0) + 1;
+            complete = book.cached_pdf_pages === book.pdf_pages;
         }
 
         await this.add_book_data(book);
+
+        complete && ExtensionConfigHelper.set_complete();
     }
 }
 
 /** 用于读写插件的配置信息 */
 export abstract class ExtensionConfigHelper {
-    private static readonly name = "ExtensionConfig";
+    public static readonly name = "ExtensionConfig";
 
-    /** 获取当前正在下载的 tabId。如果返回 null 则说明当前没有下载 */
-    static async get_target_tab(): Promise<number | null> {
+    /** 获取当前正在下载的书籍的 id 和模式等信息 */
+    static async get_current_download() {
         const res = await get_storage(this.name);
-        return res?.target_tab ?? null;
+        if (!res) return;
+
+        return {
+            tabId: res.tabId,
+            bid: res.bid,
+            mode: res.mode,
+        };
     }
 
-    /** 设置当前正在下载的 tabId。
-     * - 如果传入 null 则说明当前没有下载，情况相关配置
-     * - 否则，设置 target_tab
-     */
-    static async set_target_tab(tabId: number | null) {
-        await set_storage(this.name, { target_tab: tabId });
+    /** 设置当前正在下载的书籍的 id 和模式 */
+    static async set_current_download(
+        tabId: number,
+        bid: string,
+        mode: ReadMode,
+    ) {
+        const res = await get_storage(this.name);
+        await set_storage(this.name, { ...res, tabId, bid, mode });
+    }
+
+    /** 当下载完成后，调用它清空配置 */
+    static async clear_current_download() {
+        await set_storage(this.name, {});
+    }
+
+    /** 设置标志位：当前已经完成了下载。后续可以监听此变化完成打包 */
+    static async set_complete() {
+        const res = await get_storage(this.name);
+        await set_storage(this.name, { ...res, complete: true });
     }
 }
