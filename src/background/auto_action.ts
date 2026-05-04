@@ -67,7 +67,7 @@ async function press_key(
     }
 }
 
-/** 当开启下载后，就需要进行自动化翻页了，不同模式下有不同的翻页方式 */
+/** 当开启下载后，就需要进行自动化翻页了 */
 export async function start_auto_action(tabId: number) {
     await chrome.tabs.reload(tabId);
     // #cure-tip 创建定时器，3s 触发一次

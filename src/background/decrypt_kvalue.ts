@@ -473,9 +473,9 @@ const r_instance = new R();
 let initializing = false;
 let intialized = false;
 
-/** 该值是浏览器的指纹，似乎还随时间变动，因为之前取的值已经失效了。
+/** 该值是浏览器的指纹，似乎还随时间变动 —— 因为之前取的静态值已经失效了，我做出了这样的判断。
  *
- * 但网站计算出来后会将其写入到 `cookie` 的 `gidf` 字段中，所以直接使用该值即可。
+ * 网站计算出该值后，会将其写入到 `cookie` 的 `gidf` 字段中，所以插件直接使用该值即可。
  */
 async function get_r_key() {
     const cookie = await chrome.cookies.get({

@@ -7,7 +7,7 @@ export default class CureLogger {
     private readonly cure_answer = "#C576FF";
     private readonly cure_mystique = "#FE6998";
     private readonly cure_eclair = "#40B9E1";
-    private readonly cure_arcana_shadow = "#5C438A";
+    private readonly cure_arcana_shadow = "#ea9a7e";
     private readonly base_style =
         "color:white; font-weight:bold; border-radius:3px; padding:2px 5px;";
     private readonly log_style = `background-color:${this.cure_answer};${this.base_style}`;

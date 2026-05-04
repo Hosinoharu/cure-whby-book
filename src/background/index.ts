@@ -11,7 +11,6 @@ logger.log("Cure Cure ~\\(≧▽≦)/~");
 
 // #cure-test 测试时应该保留下载的内容，方便后续快速测试 epub、pdf 的生成
 if (!__IS_DEV__) {
-    // 安装插件时删除清空建数据库
     chrome.runtime.onInstalled.addListener(() => {
         CureBookPageDB.Instance.remove_all();
     });
@@ -41,17 +40,7 @@ async function disable_extension(tabId: number) {
 async function enable_extension(tabId: number) {
     // 如果标签页原本不是目标页面，插件被禁止使用
     // 现在调用本方法，就说明进行了刷新等操作，相当于重置了插件的状态了咯
-    // 可以忽略下面的重置语句
-    // await chrome.action.setTitle({ title: "", tabId });
-    // await chrome.action.setIcon({
-    //     path: {
-    //         16: "/icons/icon-16.png",
-    //         32: "/icons/icon-32.png",
-    //         64: "/icons/icon-64.png",
-    //         128: "/icons/icon-128.png",
-    //     },
-    //     tabId,
-    // });
+    // 可以忽略一些重置语句
     await chrome.action.enable(tabId);
 }
 

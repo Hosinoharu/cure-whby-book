@@ -54,6 +54,7 @@ export async function save_book_simple_data(
         pdf_pages = current_pages;
     }
 
+    const old_book_data = await BookStorageHelper.get_book_data(bid);
     const book_data: OneBookData = {
         bid,
         name: check_book_data(raw_data.name, "book name is null"),
@@ -65,6 +66,10 @@ export async function save_book_simple_data(
         pub: check_book_data(raw_data.pub, "book pub is null"),
         catalog: await get_book_catalog(bid),
         has_epub,
+
+        // 需要保存以前的一些数据哟，因为它们并非从网站获取的啦
+        cached_pages: old_book_data?.cached_pages,
+        cached_pdf_pages: old_book_data?.cached_pdf_pages,
     };
 
     logger.log(
