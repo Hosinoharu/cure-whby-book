@@ -93,7 +93,7 @@ export async function save_book_simple_data(
 async function get_book_pages_in_pdf_mode(bid: string): Promise<number> {
     const url = BOOK_SIMPLE_DATA2 + bid;
     const referer = BOOK_PDF_READ_PAGE + bid;
-    const revoke = await add_referer_to_initread(url, referer);
+    const revoke = await add_referer_to_req(url, referer);
 
     let res: any;
     try {
@@ -113,15 +113,35 @@ async function get_book_pages_in_pdf_mode(bid: string): Promise<number> {
     return parseInt(check_book_data(raw_data.pages, "book pages is null"));
 }
 
-/** 获取书籍的目录数据 */
+/** 获取书籍的目录数据
+ *
+ * 已经调整了实现，具体见 `doc/analysis.md` 中的【书籍大纲、目录】部分。
+ */
 async function get_book_catalog(bid: string): Promise<BookCatalogNode[]> {
+    const a_catalog = await get_book_catalog_raw(bid);
+    const b_catalog = await get_book_catalog_raw(bid, BOOK_PDF_READ_PAGE + bid);
+
+    return merge_catalog(a_catalog, b_catalog);
+}
+
+async function get_book_catalog_raw(
+    bid: string,
+    referer?: string,
+): Promise<BookCatalogNode[]> {
     const url = BOOK_CATALOG + bid;
-    const response = await fetch(url, {
-        headers: {
-            referer: `${BOOK_HOST}/book/${bid}`,
-        },
-    });
-    const res = await response.json();
+    const revoke = referer
+        ? await add_referer_to_req(url, referer)
+        : async () => {};
+
+    let res: any;
+    try {
+        const response = await fetch(url);
+        res = await response.json();
+    } catch {
+        logger.error("fetch book catalog error");
+    } finally {
+        await revoke();
+    }
 
     if (check_book_data(res.code, "response code is null") !== 0) {
         return [];
@@ -145,15 +165,62 @@ function format_catalog(nodes: any[]): BookCatalogNode[] {
             id: check_book_data(node.id, "node id is null"),
             pid: check_book_data(node.pid, "node pid is null"),
             label: check_book_data(node.label, "node label is null"),
-            level: check_book_data(node.level, "node level is null"),
-            pnum: check_book_data(node.pnum, "node pnum is null"),
-            isLeaf: check_book_data(node.isLeaf, "node isLeaf is null"),
+            level: parseInt(check_book_data(node.level, "node level is null")),
+            pnum: parseInt(check_book_data(node.pnum, "node pnum is null")),
             children: node.children ? format_catalog(node.children) : null,
         };
         result.push(item);
     }
 
     return result;
+}
+
+/** 具体见 `doc/analysis.md` 中的【书籍大纲、目录】部分。
+ *
+ * @param a 普通情况下的目录信息
+ * @param b pdf 阅读模式下的目录信息
+ */
+function merge_catalog(
+    a: BookCatalogNode[],
+    b: BookCatalogNode[],
+): BookCatalogNode[] {
+    debugger;
+    // 先提取出 a 中的三级大纲，由二级标题为 key，存储它所在的页数以及子节点
+    const third_level = new Map<
+        string,
+        { pnum: number; children: BookCatalogNode[] }
+    >();
+    // 实践过程中，根据标题为 key 似乎不可靠呀，出现了非英文的空格等等情况
+    // 所以使用正则提取出前面的序号咯。注意只匹配二级大纲哟
+    const pattern = /^\d.\d/;
+    for (const level1 of a) {
+        level1.children?.forEach((level2) => {
+            if (level2.children) {
+                const key = pattern.exec(level2.label)?.[0];
+                key &&
+                    third_level.set(key, {
+                        pnum: level2.pnum,
+                        children: level2.children,
+                    });
+            }
+        });
+    }
+
+    // 然后补全 b 中的三级大纲
+    for (const level1 of b) {
+        level1.children?.forEach((level2) => {
+            const key = pattern.exec(level2.label)?.[0];
+            const third = key ? third_level.get(key) : undefined;
+            if (third) {
+                const step = level2.pnum - third.pnum;
+                level2.children = third.children?.map((node) => {
+                    return { ...node, pnum: node.pnum + step };
+                });
+            }
+        });
+    }
+
+    return b;
 }
 
 /** 给插件发出的请求添加 Referer 字段。
@@ -171,7 +238,7 @@ function format_catalog(nodes: any[]): BookCatalogNode[] {
  * await revoke();
  * ```
  */
-async function add_referer_to_initread(target: string, referer: string) {
+async function add_referer_to_req(target: string, referer: string) {
     await chrome.declarativeNetRequest.updateDynamicRules({
         removeRuleIds: [1],
     });

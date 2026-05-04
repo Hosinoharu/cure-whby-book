@@ -60,38 +60,9 @@ export const BOOK_SIMPLE_DATA2 = `${BOOK_HOST}/api/v7/read/initread?bid=`;
  * - 【原貌阅读模式】，访问 API `https://wqbook.wqxuetang.com/deep/book/v1/catatree?bid=3226417`
  * - 【流式阅读模式】，访问 API `https://wqbook.wqxuetang.com/deep/epub/catatree/3244419?k=...`
  *
- * 它们的响应内容大致相同，所以可以根据第一个 API 获取目录信息，
- * 没错，也是直接访问，毕竟不是什么敏感信息。
+ * 它们的响应内容大致相同，所以可以根据第一个 API 获取目录信息，没错，也是直接访问，毕竟不是什么敏感信息。
  *
- * # 原貌阅读模式
- * ```json
-    {
-        "id": "1153202979583557633",
-        "pid": "0",
-        "label": "参考文献",
-        "pnum": "517",
-        "level": "1",
-        "isLeaf": true,
-        "children": null
-    }
- * ```
-
- * # 流式阅读模式
- * ```json
-    {
-        "id": 307,
-        "pid": 0,
-        "level": 1,
-        "pnum": 307,
-        "label": "参考文献",
-        "src": "",
-        "srcNew": "",
-        "isLeaf": true,
-        "key": "73e41dbc5799406b",
-        "children": null,
-        "files": null
-    }
- * ```
+ * 具体见 `doc/analysis.md` 中的【书籍大纲、目录】部分。
  *
  */
 export const BOOK_CATALOG = `${BOOK_HOST}/deep/book/v1/catatree?bid=`;

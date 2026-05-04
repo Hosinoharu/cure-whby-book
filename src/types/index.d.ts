@@ -41,17 +41,15 @@ type ContentKind = "xhtml" | "css" | "img";
 /** 统一表示书籍的书签 */
 type BookCatalogNode = {
     /** 书签节点 ID */
-    id: number;
+    id: string;
     /** 父书签 ID。为 0 表示顶层书签 */
-    pid: number;
+    pid: string;
     /** 书签层级 */
     level: number;
     /** 书签对应的页数，这个是从 1 开始数的哟 */
     pnum: number;
     /** 书签的名称 */
     label: string;
-    /** 是否为叶子节点 */
-    isLeaf: boolean;
     /** 子节点列表 */
     children: BookCatalogNode[] | null;
 };
