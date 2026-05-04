@@ -494,7 +494,8 @@ footer {
 .flower-bottom {
     position: fixed;
     scale: 0.5;
-    left: 35%;
+    /* 图片大小是 128x128 */
+    left: calc(50% - 64px);
     bottom: -2.5rem;
     animation: flower 15s linear infinite;
     z-index: 1;
