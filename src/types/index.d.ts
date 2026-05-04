@@ -46,7 +46,7 @@ type BookCatalogNode = {
     pid: number;
     /** 书签层级 */
     level: number;
-    /** 书签对应的页数 */
+    /** 书签对应的页数，这个是从 1 开始数的哟 */
     pnum: number;
     /** 书签的名称 */
     label: string;

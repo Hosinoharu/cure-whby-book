@@ -1,7 +1,7 @@
 /** 生成 pdf 文件 */
 
 import CureLogger from "@/share/logger";
-import jsPDF from "jspdf";
+import jsPDF, { type OutlineItem } from "jspdf";
 
 const logger = new CureLogger("popup/pdf_generator");
 
@@ -120,6 +120,29 @@ export default class CurePdfGenerator {
 
     // #endregion
 
+    async add_bookmark() {
+        this.book_data.catalog?.forEach((c) => this.raw_add_bookmark(null, c));
+    }
+
+    /** 添加书签的原始版本哟 */
+    private raw_add_bookmark(
+        parent: OutlineItem | null,
+        node: BookCatalogNode,
+    ) {
+        // 如果实际获取的页数少了，添加书签的时候会报错，所以这里做个判断
+        // 对该情况，将页码设置为最大页数咯
+        const pnum =
+            node.pnum > this.book_pages.length - 1
+                ? this.book_pages.length - 1
+                : node.pnum;
+
+        const new_parent = this.pdf.outline.add(parent, node.label, {
+            pageNumber: pnum,
+        });
+
+        node.children?.forEach((c) => this.raw_add_bookmark(new_parent, c));
+    }
+
     async pack_and_download() {
         for (let i = 0; i < this.book_pages.length; i++) {
             const page = this.book_pages[i];
@@ -135,6 +158,8 @@ export default class CurePdfGenerator {
             );
             i < this.book_pages.length - 2 && this.pdf.addPage();
         }
+
+        this.add_bookmark();
 
         const url = this.pdf.output("bloburl");
         const filename = `${this.book_data.name}(${this.book_data.author}).pdf`;
