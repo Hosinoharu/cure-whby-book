@@ -123,12 +123,12 @@ export default class CureBookPageDB {
         chapter: number,
         filename: string,
         type: ContentKind,
-    ): Promise<boolean> {
+    ): Promise<DBOpStatus> {
         try {
             await this.init(bid);
         } catch (e) {
             logger.error("init db failed", e);
-            return false;
+            return DBOpStatus.Fail;
         }
 
         const data: BookPageStoreItem = {
@@ -147,12 +147,12 @@ export default class CureBookPageDB {
         bid: string,
         page: number,
         content: PdfSplitImageContent,
-    ): Promise<boolean> {
+    ): Promise<DBOpStatus> {
         try {
             await this.init(bid);
         } catch (e) {
             logger.error("init db failed", e);
-            return false;
+            return DBOpStatus.Fail;
         }
 
         const data: BookPageStoreItem = {
@@ -167,7 +167,7 @@ export default class CureBookPageDB {
 
     private async save_one_page_data(
         data: BookPageStoreItem,
-    ): Promise<boolean> {
+    ): Promise<DBOpStatus> {
         const db = this.get_book_conn(data.bid).db;
         const req = db
             ?.transaction(this.store_name, "readwrite")
@@ -175,14 +175,14 @@ export default class CureBookPageDB {
             ?.add(data);
 
         if (req === undefined) {
-            return false;
+            return DBOpStatus.Fail;
         }
 
         return new Promise((resolve, reject) => {
             req.onsuccess = () => {
                 DEBUG.LOG_ADD_ITEM &&
                     logger.log("save_epub_one_page data ok", data);
-                resolve(true);
+                resolve(DBOpStatus.Ok);
             };
             req.onerror = (e) => {
                 const err = (e.target as IDBRequest).error;
@@ -193,7 +193,7 @@ export default class CureBookPageDB {
                     DEBUG.LOG_ADD_ITEM &&
                         logger.warn("save_epub_one_page data exist", data);
 
-                    return resolve(true);
+                    return resolve(DBOpStatus.Exist);
                 }
                 logger.error("save_one_epub_page failed", e);
                 reject(err?.message);
@@ -335,4 +335,14 @@ export default class CureBookPageDB {
     }
 
     // #endregion
+}
+
+/** 表示数据库操作的状态 */
+export enum DBOpStatus {
+    /** 操作失败 */
+    Fail,
+    /** 操作成功 */
+    Ok,
+    /** 该数据已经存在 */
+    Exist,
 }

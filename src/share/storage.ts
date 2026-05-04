@@ -60,6 +60,20 @@ export abstract class BookStorageHelper {
             await set_storage(this.name, books);
         }
     }
+
+    /** 当缓存一页时，调用它来更新已经下载的页数 */
+    static async cache_one_page(bid: string, mode: ReadMode) {
+        const book = await this.get_book_data(bid);
+        if (book === undefined) return;
+
+        if (mode === "epub") {
+            book.cached_pages = (book.cached_pages ?? 0) + 1;
+        } else {
+            book.cached_pdf_pages = (book.cached_pdf_pages ?? 0) + 1;
+        }
+
+        await this.add_book_data(book);
+    }
 }
 
 /** 用于读写插件的配置信息 */

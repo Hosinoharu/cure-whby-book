@@ -50,11 +50,20 @@
             </div>
             <div class="item">
                 <span class="label">页数</span>
-                <span class="value">
+                <span
+                    class="value"
+                    style="color: var(--cure-arcana-shadow); font-weight: bold"
+                >
                     {{
                         read_mode === "epub"
                             ? book_info.pages
                             : book_info.pdf_pages
+                    }}
+                    /
+                    {{
+                        read_mode === "epub"
+                            ? (book_info.cached_pages ?? 0)
+                            : (book_info.cached_pdf_pages ?? 0)
                     }}
                 </span>
             </div>
@@ -205,7 +214,7 @@ async function update_book_info(force = false) {
 
     if (__IS_DEV_UI__) {
         read_mode.value = "epub";
-        // book_info.value = await get_book_info("dev mode", false);
+        book_info.value = await get_book_info("dev mode", false);
         set_status("当前展示的是开发模式下的信息");
         return;
     }
@@ -265,6 +274,8 @@ async function get_book_info(
             pub: "魔法城堡图书管理部",
             date: "2026-04-30",
             has_epub: true,
+            cached_pages: 10,
+            cached_pdf_pages: 20,
         };
     }
 

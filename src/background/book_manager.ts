@@ -2,8 +2,9 @@
 
 import CureLogger from "@/share/logger";
 import CryptoJS from "crypto-js";
-import CureBookPageDB from "@/share/book_page_db";
+import CureBookPageDB, { DBOpStatus } from "@/share/book_page_db";
 import decrypt_kvalue from "./decrypt_kvalue";
+import { BookStorageHelper } from "@/share/storage";
 
 const logger = new CureLogger("bg/book_manager");
 const DEBUG = {
@@ -41,7 +42,7 @@ export abstract class CureWhbyBookManager {
                 content,
             );
 
-        const ok = await CureBookPageDB.Instance.save_epub_one_page(
+        const status = await CureBookPageDB.Instance.save_epub_one_page(
             bid,
             page,
             new_content,
@@ -50,7 +51,11 @@ export abstract class CureWhbyBookManager {
             type,
         );
 
-        !ok &&
+        status === DBOpStatus.Ok &&
+            type === "xhtml" &&
+            (await BookStorageHelper.cache_one_page(bid, "epub"));
+
+        status === DBOpStatus.Fail &&
             logger.error(
                 "save_epub_one_page assets failed",
                 "bid:",
@@ -84,13 +89,16 @@ export abstract class CureWhbyBookManager {
                 content,
             );
 
-        const ok = await CureBookPageDB.Instance.save_pdf_one_page(
+        const status = await CureBookPageDB.Instance.save_pdf_one_page(
             bid,
             page,
             content,
         );
 
-        !ok &&
+        status === DBOpStatus.Ok &&
+            (await BookStorageHelper.cache_one_page(bid, "pdf"));
+
+        status === DBOpStatus.Fail &&
             logger.error(
                 "save_pdf_one_page failed",
                 "bid:",

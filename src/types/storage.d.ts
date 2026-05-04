@@ -15,8 +15,10 @@ type ExtensionConfig = {
 
 /** 保存一本书的完整信息 */
 type OneBookData = OneBookSimpleData & {
-    /** 已经下载的页数 */
-    downloaded_pages?: number[];
+    /** 已经下载的 epub 页数 */
+    cached_pages?: number;
+    /** 已经下载的 pdf 页数 */
+    cached_pdf_pages?: number;
 };
 
 type BaseBookPageStoreItem = {
