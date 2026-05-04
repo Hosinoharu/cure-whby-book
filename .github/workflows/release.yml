@@ -4,6 +4,9 @@ on:
     push:
         branches: [main]
 
+permissions:
+    contents: write
+
 jobs:
     build-and-release:
         runs-on: ubuntu-latest
@@ -11,11 +14,13 @@ jobs:
         steps:
             - name: Checkout code
               uses: actions/checkout@v4
+              with:
+                  fetch-depth: 0
 
             - name: Setup Node.js
               uses: actions/setup-node@v4
               with:
-                  node-version: "22"
+                  node-version: "24"
                   cache: "npm"
 
             - name: Install dependencies
@@ -47,6 +52,25 @@ jobs:
                   echo "TAG=${LATEST_TAG}" >> $GITHUB_ENV
                   echo "tag=${LATEST_TAG}" >> $GITHUB_OUTPUT
 
+            - name: Package dist folder to zip
+              run: |
+                  if [ ! -d "dist" ]; then
+                    echo "Error: dist directory not found!"
+                    exit 1
+                  fi
+
+                  cd dist
+                  zip -r ../dist-${{ env.VERSION }}.zip .
+                  cd ..
+
+                  if [ -f "dist-${{ env.VERSION }}.zip" ]; then
+                    echo "Successfully created: dist-${{ env.VERSION }}.zip"
+                    ls -lh dist-*.zip
+                  else
+                    echo "Failed to create zip file!"
+                    exit 1
+                  fi
+
             - name: Create Release
               id: create_release
               uses: actions/create-release@v1
@@ -66,6 +90,6 @@ jobs:
                   GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
               with:
                   upload_url: ${{ steps.create_release.outputs.upload_url }}
-                  asset_path: ./dist
+                  asset_path: ./dist-${{ env.VERSION }}.zip
                   asset_name: dist-${{ env.VERSION }}.zip
                   asset_content_type: application/zip
